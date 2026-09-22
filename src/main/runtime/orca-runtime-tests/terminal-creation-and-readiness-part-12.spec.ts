@@ -1,6 +1,39 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from '../orca-runtime-test-mocks.spec'
-import { store, syncSinglePty } from '../orca-runtime-test-fixtures.spec'
+import {
+  TEST_WORKTREE_ID,
+  TEST_WORKTREE_PATH,
+  store,
+  syncSinglePty
+} from '../orca-runtime-test-fixtures.spec'
+
+function runtimeWithDesktopWindow() {
+  const revealTerminalSession = vi.fn().mockResolvedValue({ tabId: 'tab-revealed' })
+  const runtime = new OrcaRuntimeService(store)
+  runtime.setPtyController({
+    spawn: vi.fn().mockResolvedValue({ id: 'pty-launch' }),
+    write: () => true,
+    kill: () => true,
+    getForegroundProcess: async () => null
+  })
+  runtime.setNotifier({
+    worktreesChanged: vi.fn(),
+    reposChanged: vi.fn(),
+    activateWorktree: vi.fn(),
+    createTerminal: vi.fn(),
+    revealTerminalSession,
+    splitTerminal: vi.fn(),
+    renameTerminal: vi.fn(),
+    focusTerminal: vi.fn(),
+    closeTerminal: vi.fn(),
+    sleepWorktree: vi.fn(),
+    terminalFitOverrideChanged: vi.fn(),
+    terminalDriverChanged: vi.fn()
+  })
+  runtime.attachWindow(1)
+  runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
+  return { runtime, revealTerminalSession }
+}
 
 describe('OrcaRuntimeService', () => {
   it('bounds retained work for many newline-separated huge ANSI cursor movements', async () => {
@@ -73,5 +106,35 @@ describe('OrcaRuntimeService', () => {
     expect(retained).toContain('BeforeAfter')
     expect(retained).not.toContain('Gi=31337')
     expect(retained).not.toContain('AAAA')
+  })
+
+  // The gate agent.launch's `presentation: 'background'` lands on; its RPC tests stop at the mock.
+  it('reveals an agent terminal to a desktop window by default', async () => {
+    const { runtime, revealTerminalSession } = runtimeWithDesktopWindow()
+
+    const created = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      startupAgent: 'claude'
+    })
+
+    expect(revealTerminalSession).toHaveBeenCalledTimes(1)
+    expect(revealTerminalSession).toHaveBeenCalledWith(
+      TEST_WORKTREE_ID,
+      expect.objectContaining({ ptyId: 'pty-launch', tabId: created.tabId })
+    )
+    expect(created.surface).toBe('visible')
+  })
+
+  it('skips the reveal for a background agent terminal and still names its pane', async () => {
+    const { runtime, revealTerminalSession } = runtimeWithDesktopWindow()
+
+    const created = await runtime.createTerminal(`path:${TEST_WORKTREE_PATH}`, {
+      startupAgent: 'claude',
+      presentation: 'background'
+    })
+
+    expect(revealTerminalSession).not.toHaveBeenCalled()
+    expect(created.surface).toBe('background')
+    // A caller that suppressed the reveal draws the tab itself, so it must learn which pane.
+    expect(created.paneKey?.startsWith(`${created.tabId}:`)).toBe(true)
   })
 })
