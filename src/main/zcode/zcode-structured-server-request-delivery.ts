@@ -109,5 +109,8 @@ export function deliverZcodeServerRequest(input: {
   }
   session.items.set(requestId, body)
   session.promptItemIds.set(agentJournalItemKey(identity), requestId)
+  // Codex parity: a permission wait can be the only live activity, so the row
+  // must publish now rather than wait for the next notification's publish.
+  session.sink?.publish({ lifecycle: true })
   emitPrompt()
 }

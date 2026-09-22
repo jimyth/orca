@@ -5,7 +5,10 @@ import type {
   AgentJournalItemIdentity
 } from '../../shared/agent-session-journal-types'
 import { ZcodeAppServerRequestError } from './zcode-app-server-connection'
-import type { StructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
+import type {
+  StructuredAgentSessionAppendOptions,
+  StructuredAgentSessionEventSink
+} from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
 import { ZcodeStructuredSessionAdapter } from './zcode-structured-session-adapter'
 import {
   ZCODE_ERROR_CODES,
@@ -85,8 +88,10 @@ function recordingSink(
   sink: StructuredAgentSessionEventSink
   appended: () => RecordedAppend[]
   rows: () => RecordedAppend[]
+  published: () => StructuredAgentSessionAppendOptions[]
 } {
   const appends: RecordedAppend[] = []
+  const publishCalls: StructuredAgentSessionAppendOptions[] = []
   const byKey = new Map<string, RecordedAppend>()
   const record = (identity: AgentJournalItemIdentity, body: AgentJournalItemBody): void => {
     const row = { identity, body }
@@ -96,7 +101,9 @@ function recordingSink(
   const sink: StructuredAgentSessionEventSink = {
     appendItem: record,
     appendTombstone: () => {},
-    publish: () => {},
+    publish: (options) => {
+      publishCalls.push(options ?? {})
+    },
     tryAppendItem: (identity, body) => {
       const verdict = admission()
       if (verdict.accepted) {
@@ -105,7 +112,12 @@ function recordingSink(
       return verdict
     }
   }
-  return { sink, appended: () => appends, rows: () => [...byKey.values()] }
+  return {
+    sink,
+    appended: () => appends,
+    rows: () => [...byKey.values()],
+    published: () => publishCalls
+  }
 }
 
 async function acquiredWithSink(
@@ -356,6 +368,17 @@ describe('ZcodeStructuredSessionAdapter prompts', () => {
     ])
   })
 
+  it('publishes the journal checkpoint right after admitting a permission prompt', async () => {
+    const zcode = fakeZcode()
+    const { sink, published } = recordingSink()
+    await acquiredWithSink(zcode, [], sink)
+
+    expect(published()).toHaveLength(0)
+    askPermission(zcode, 'server-3')
+
+    expect(published()).toEqual([{ lifecycle: true }])
+  })
+
   it('responds to the latest frame and never twice for one requestId', async () => {
     const zcode = fakeZcode()
     const { sink, appended } = recordingSink()
@@ -462,7 +485,10 @@ describe('ZcodeStructuredSessionAdapter prompts', () => {
 
   it('answers an error when the prompt row cannot be admitted to the journal', async () => {
     const zcode = fakeZcode()
-    const { sink } = recordingSink(() => ({ accepted: false as const, reason: 'closed' as const }))
+    const { sink, published } = recordingSink(() => ({
+      accepted: false as const,
+      reason: 'closed' as const
+    }))
     const events: Parameters<typeof acquired>[1] = []
     const adapter = await acquiredWithSink(zcode, events, sink)
 
@@ -475,6 +501,7 @@ describe('ZcodeStructuredSessionAdapter prompts', () => {
         message: expect.stringContaining('could not durably record')
       }
     ])
+    expect(published()).toHaveLength(0)
     expect(events.filter((event) => event.type === 'prompt')).toHaveLength(0)
     await expect(
       adapter.answerPrompt({
