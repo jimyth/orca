@@ -15,7 +15,6 @@ import { z } from 'zod'
 import { parseAgentSessionOperationTimestamp } from '../agent-session-host-authority'
 import { isTuiAgent } from '../tui-agent-config'
 import type { TuiAgent } from '../tui-agent'
-import { Presentation } from './agent-session-params'
 import { WorktreeCreate } from './worktree-create-params'
 
 const LaunchAgent = z
@@ -83,26 +82,29 @@ export const AgentLaunch = z.object({
    */
   launchSource: z.string().optional(),
   /**
-   * Who presents the surface this launch creates — never where it goes.
+   * Who presents the surface this launch creates — never where it goes. `background` means the
+   * caller draws the tab itself from the `paneKey` the outcome reports, so the host skips its
+   * reveal. Absent is NOT `background`: it keeps the reveal every shipped caller relies on.
    *
-   * The same `presentation` vocabulary `terminal.create` and `agentSession.create` already take,
-   * for the same reason: `background` means the caller draws the surface itself, so the host must
-   * not drive a reveal. `launch-agent-in-new-tab` is the case that needs it — it places its own tab
-   * from the `paneKey` the outcome reports, and a host reveal on top of that is a second tab.
+   * One arm, deliberately narrower than the `background | focused` its siblings take. On this
+   * method `focused` flips the routing at orca-runtime-create-terminal.ts:18-25 onto the
+   * renderer-backed create, which reports no `paneKey` — the field this feature is built on — and
+   * forwards no `telemetry`, so `agent_started` never fires. A literal rather than a one-member
+   * enum so widening cannot be a one-word append.
    *
-   * Absent is NOT `background`. Omitting it keeps the host revealing exactly as it does today, so
-   * every shipped caller — mobile, orchestration, the CLI — is unaffected, and an older client that
-   * cannot send the field is indistinguishable from one that chose the default. Only an explicit
-   * `background` suppresses.
+   * WIDENING THIS ARM SET REINTRODUCES BOTH DEFECTS, and this schema is the only guard: unlike
+   * `terminal.create` and `agentSession.create` there is no authority clamp behind it, so a second
+   * arm is immediately reachable by a remote caller. Fix that routing first.
    *
-   * Placement stays off this wire: no group, anchor, order, focus target or navigation. Mobile
-   * speaks this method and has no tabs.
+   * A caller must read `AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY` before relying on the
+   * opt-out: an older host strips this key and reveals anyway, which is the second tab it exists
+   * to prevent.
    *
-   * Terminal surfaces only, because they are the only ones with a pane a caller could place. A
-   * structured launch's tab is published by the host and always has been, and the caller learns
-   * which it got from `outcome.kind` — so this is out of scope there, not silently dropped.
+   * Placement stays off this wire: no group, anchor, order, focus target or navigation. Terminal
+   * surfaces only — a structured launch's tab is published by the host, and the caller learns
+   * which surface it got from `outcome.kind`.
    */
-  presentation: Presentation.optional()
+  presentation: z.literal('background').optional()
 })
 
 export type AgentLaunchParams = z.infer<typeof AgentLaunch>

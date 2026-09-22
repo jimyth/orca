@@ -40,7 +40,7 @@ export function agentLaunchSurfaceFactory(
   operationCallerKey?: string
 ): AgentLaunchSurfaceFactory {
   return {
-    createStructuredSession: async ({ worktreeId, agent, options }) => {
+    createStructuredSession: async ({ worktreeId, agent, options, presentation }) => {
       const sessionId = randomUUID()
       const seeded = narrowStructuredLaunchSeedOptions(options)
       const created = await createStructuredAgentSessionForWorktree({
@@ -65,8 +65,9 @@ export function agentLaunchSurfaceFactory(
         worktree: `id:${worktreeId}`,
         agent,
         ...(seeded ? { options: seeded } : {}),
-        // The user asked for this chat, so it takes the surface — unlike a dispatched worker.
-        activate: true
+        // The user asked for this chat, so it takes the surface — unless the caller said it
+        // presents the surface itself, in which case stealing focus is the thing it opted out of.
+        activate: presentation !== 'background'
       })
       if (!created.ok) {
         throw new AgentLaunchStructuredSessionRefusedError(

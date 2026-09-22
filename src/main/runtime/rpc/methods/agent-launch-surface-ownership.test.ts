@@ -13,7 +13,7 @@
  * `presentation` is not placement. Nothing below asks for a group, an order or a focus target.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RpcContext } from '../core'
 import {
   CAPABLE_CLIENT,
@@ -23,12 +23,17 @@ import {
   type AgentLaunchRuntimeStub as RuntimeStub
 } from './agent-launch.test-fixture'
 
+const createStructuredSession = vi.hoisted(() =>
+  vi.fn(async (_args: Record<string, unknown>) => ({ ok: true, value: { sessionId: 'sess-1' } }))
+)
+
 vi.mock('./structured-agent-session-create', () => ({
-  createStructuredAgentSessionForWorktree: async () => ({
-    ok: true,
-    value: { sessionId: 'sess-1' }
-  })
+  createStructuredAgentSessionForWorktree: createStructuredSession
 }))
+
+beforeEach(() => {
+  createStructuredSession.mockClear()
+})
 
 const { AGENT_LAUNCH_METHODS } = await import('./agent-launch')
 const AGENT_LAUNCH = methodNamed(AGENT_LAUNCH_METHODS, 'agent.launch')
@@ -83,12 +88,13 @@ describe('a launch into an existing workspace', () => {
     expect(terminalOptions(runtime)).not.toHaveProperty('presentation')
   })
 
-  it('forwards an explicit focused presentation rather than swallowing it', async () => {
+  it('refuses a focused presentation at the wire rather than routing it', async () => {
+    // `focused` would send the create down the renderer-backed path, which reports no `paneKey`
+    // and fires no `agent_started`. The schema is the whole guard — there is no clamp behind it.
     const runtime = runtimeStub({ settings: TERMINAL_ONLY })
 
-    await launch({ ...EXISTING_LAUNCH, presentation: 'focused' }, runtime)
-
-    expect(terminalOptions(runtime).presentation).toBe('focused')
+    await expect(launch({ ...EXISTING_LAUNCH, presentation: 'focused' }, runtime)).rejects.toThrow()
+    expect(runtime.createTerminal).not.toHaveBeenCalled()
   })
 
   it('keeps the opt-out through a downgrade from structured to terminal', async () => {
@@ -146,6 +152,28 @@ describe('a launch that creates its workspace', () => {
 
     const args = runtime.createManagedWorktree.mock.calls[0]?.[0] ?? {}
     expect(args).not.toHaveProperty('presentation')
+  })
+})
+
+describe('a launch the host routes to a chat instead', () => {
+  // Which route a launch takes is the host's decision and the caller cannot predict it. So the
+  // opt-out has to mean the same thing on both: a caller that said it presents the surface must
+  // not have a chat tab pulled in front of it either.
+  it('publishes the chat without activating it when the caller presents its own surface', async () => {
+    const runtime = runtimeStub()
+
+    const result = await launch({ ...EXISTING_LAUNCH, presentation: 'background' }, runtime)
+
+    expect(result.outcome).toMatchObject({ kind: 'structured' })
+    expect(createStructuredSession.mock.calls[0]?.[0]).toMatchObject({ activate: false })
+  })
+
+  it('still takes the surface when the caller asked for nothing', async () => {
+    const runtime = runtimeStub()
+
+    await launch(EXISTING_LAUNCH, runtime)
+
+    expect(createStructuredSession.mock.calls[0]?.[0]).toMatchObject({ activate: true })
   })
 })
 

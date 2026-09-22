@@ -51,6 +51,42 @@ function createPorts() {
   return { createTerminal, ports }
 }
 
+/** The startup terminal the create spawns — the surface `agent.launch` opts out of revealing. */
+async function startWithStartupTerminal(
+  createPorts_: ReturnType<typeof createPorts>,
+  request: Partial<StartupArgs['request']>
+) {
+  await startRuntimeLocalWorktreeTerminals({
+    request: { repoSelector: `id:${repo.id}`, name: worktree.displayName, ...request },
+    repo,
+    worktree,
+    createdWithAgent: 'codex',
+    startup: { command: 'codex' },
+    ports: createPorts_.ports
+  })
+  return createPorts_.createTerminal.mock.calls[0]?.[1] ?? {}
+}
+
+describe('startRuntimeLocalWorktreeTerminals startup presentation', () => {
+  // Read, not merely accepted: the local, folder and remote creates each forward this separately,
+  // so nothing above them catches the one that stops.
+  it('asks the runtime not to reveal when the caller presents the startup terminal itself', async () => {
+    const ports = createPorts()
+
+    const options = await startWithStartupTerminal(ports, { startupPresentation: 'background' })
+
+    expect(options.presentation).toBe('background')
+  })
+
+  it('leaves the reveal in place when no presentation was asked for', async () => {
+    const ports = createPorts()
+
+    const options = await startWithStartupTerminal(ports, {})
+
+    expect(options).not.toHaveProperty('presentation')
+  })
+})
+
 describe('startRuntimeLocalWorktreeTerminals default shell seeding', () => {
   it.each([
     ['Blank Terminal', undefined, 1],

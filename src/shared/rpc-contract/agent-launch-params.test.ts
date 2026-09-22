@@ -7,6 +7,10 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import {
+  AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY,
+  RUNTIME_CAPABILITIES
+} from '../protocol-version'
 import { AgentLaunch } from './agent-launch-params'
 
 const BASE = { agent: 'claude', target: { kind: 'existing', worktree: 'wt-1' } }
@@ -31,11 +35,17 @@ describe('agent.launch params', () => {
     expect(parsed.data?.launchSource).toBe('a_surface_added_later')
   })
 
-  it('accepts either arm of the presentation vocabulary the sibling methods already take', () => {
+  it('accepts the one arm this method can honour', () => {
     expect(AgentLaunch.parse({ ...BASE, presentation: 'background' }).presentation).toBe(
       'background'
     )
-    expect(AgentLaunch.parse({ ...BASE, presentation: 'focused' }).presentation).toBe('focused')
+  })
+
+  it('refuses `focused`, which the sibling methods take and this one cannot honour', () => {
+    // Not a vocabulary oversight. `focused` routes the create through the renderer-backed path,
+    // which reports no `paneKey` and fires no `agent_started`; the schema is the only guard,
+    // because unlike its siblings this method has no authority clamp behind it.
+    expect(AgentLaunch.safeParse({ ...BASE, presentation: 'focused' }).success).toBe(false)
   })
 
   it('leaves presentation absent rather than defaulting it', () => {
@@ -44,7 +54,7 @@ describe('agent.launch params', () => {
     expect(AgentLaunch.parse(BASE)).not.toHaveProperty('presentation')
   })
 
-  it('refuses a presentation that is not one of the two arms', () => {
+  it('refuses a presentation it has never heard of', () => {
     expect(AgentLaunch.safeParse({ ...BASE, presentation: 'hidden' }).success).toBe(false)
   })
 
@@ -54,5 +64,20 @@ describe('agent.launch params', () => {
     expect(parsed).not.toHaveProperty('cwd')
     expect(parsed).not.toHaveProperty('launchSource')
     expect(parsed).not.toHaveProperty('presentation')
+  })
+})
+
+// Why: an older host strips the unknown key and reveals anyway, and its reply is otherwise
+// identical — same `paneKey`, same handle. A caller that presents its own tab must read this
+// before sending the opt-out, or it draws a second tab beside the one the host revealed.
+describe('the opt-out a caller has to negotiate first', () => {
+  it('uses the id a caller codes against', () => {
+    expect(AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY).toBe(
+      'agent.launch.surface-ownership.v1'
+    )
+  })
+
+  it('is advertised by every host that honours the field', () => {
+    expect(RUNTIME_CAPABILITIES).toContain(AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY)
   })
 })

@@ -27,12 +27,12 @@
 
 import type {
   AgentLaunchIntent,
+  AgentLaunchPresentation,
   AgentLaunchPrompt,
   AgentLaunchResult,
   AgentLaunchTarget
 } from '../../shared/agent-launch-intent'
 import { withoutReservedAgentCreateFields } from '../../shared/agent-launch-intent'
-import type { RuntimeTerminalPresentation } from '../../shared/runtime-terminal-contracts'
 import {
   argvLaunchPrompt,
   deliverTerminalLaunchPrompt,
@@ -65,6 +65,10 @@ export type AgentLaunchSurfaceFactory = {
     worktreeId: string
     agent: 'claude' | 'codex'
     options?: Readonly<Record<string, unknown>>
+    /** `background` means the caller presents this chat, so the host publishes its tab without
+     *  activating it. The route is the host's decision, so the field has to mean the same thing on
+     *  both branches or a caller that asked for `background` loses focus to a tab it did not pick. */
+    presentation?: AgentLaunchPresentation
   }): Promise<AgentLaunchStructuredSurface>
   createTerminalAgent(args: {
     worktreeId: string
@@ -80,7 +84,7 @@ export type AgentLaunchSurfaceFactory = {
     launchSource?: string
     /** `background` when the caller draws this terminal's tab itself, so the runtime creates the
      *  agent without revealing it. Absent leaves the runtime's own reveal in place. */
-    presentation?: RuntimeTerminalPresentation
+    presentation?: AgentLaunchPresentation
     /** `paneKey` names the pane this create minted, for a caller that presents its own tabs; a
      *  factory whose runtime does not report one omits it rather than inventing a key. */
   }): Promise<{ handle: string; paneKey?: string; warning?: string }>
@@ -143,7 +147,7 @@ export type AgentLaunchWorkspaceFactory = {
     agentArgs?: string | null
     cwd?: string
     launchSource?: string
-    presentation?: RuntimeTerminalPresentation
+    presentation?: AgentLaunchPresentation
   }): Promise<{
     worktreeId: string
     startupTerminalHandle: string | undefined
@@ -342,7 +346,9 @@ async function createSurface(
     const session = await surfaces.createStructuredSession({
       worktreeId,
       agent: intent.agent,
-      ...(intent.sessionOptions ? { options: intent.sessionOptions } : {})
+      ...(intent.sessionOptions ? { options: intent.sessionOptions } : {}),
+      // The caller cannot predict which route it lands on, so the opt-out has to reach this one too.
+      ...(intent.presentation ? { presentation: intent.presentation } : {})
     })
     return {
       outcome: { kind: 'structured', sessionId: session.sessionId, handle: session.handle },

@@ -273,6 +273,13 @@ export const AGENT_LAUNCH_REPLAY_RUNTIME_CAPABILITY = 'agent.launch.replay.v1' a
 export const AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY =
   'agent.launch.replay-required.v1' as const
 
+// Why: an older host strips agent.launch's unknown `presentation` and reveals the tab anyway,
+// while still reporting the `paneKey` a caller draws its own tab from. That reply is
+// indistinguishable from success, so a caller presenting its own surface gets two tabs unless it
+// refuses the opt-out on a host that does not advertise this.
+export const AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY =
+  'agent.launch.surface-ownership.v1' as const
+
 // Generic native clients include the CLI and must not claim Electron-only page
 // placement support.
 export const NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES = [
@@ -389,7 +396,8 @@ export const RUNTIME_CAPABILITIES = [
   NOTIFICATIONS_REMOTE_PUSH_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_REPLAY_RUNTIME_CAPABILITY,
-  AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY
+  AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})
