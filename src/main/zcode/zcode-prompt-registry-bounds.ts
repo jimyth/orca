@@ -1,3 +1,8 @@
+import {
+  JsonStringifyByteLimitError,
+  stringifyJsonWithinByteLimit
+} from '../../shared/node-bounded-json-stringify'
+
 // Bounds mirror the codex registry caps: enough headroom for every live prompt
 // of a busy session, small enough that a hostile frame cannot balloon memory.
 export const MAX_ZCODE_PROMPT_REGISTRY_ENTRIES = 128
@@ -6,6 +11,10 @@ export const ZCODE_PROMPT_MAX_OPTIONS = 256
 export const ZCODE_PROMPT_MAX_OPTION_BYTES = 64 * 1024
 export const ZCODE_PROMPT_MAX_QUESTIONS = 64
 export const ZCODE_PROMPT_MAX_QUESTION_BYTES = 32 * 1024
+export const ZCODE_PROMPT_MAX_INPUT_BYTES = 64 * 1024
+
+const ZCODE_PROMPT_INPUT_TRUNCATED_SUFFIX = '…[truncated]'
+const ZCODE_PROMPT_UNSERIALIZABLE_INPUT = '[unserializable zcode permission input]'
 
 export type ZcodePromptOption = {
   optionId: string
@@ -46,6 +55,41 @@ function jsonBytes(value: unknown): number {
     // Non-serializable payloads cannot come from a parsed frame; treat as oversized.
     return Number.MAX_SAFE_INTEGER
   }
+}
+
+/**
+ * Bounded serialization of the permission `input` payload — the core content
+ * the permission UI shows (e.g. the file about to be written). Oversized
+ * values keep a prefix plus a truncation marker; unserializable ones keep a
+ * placeholder rather than throwing.
+ */
+export function readZcodePermissionInput(params: unknown): string | null {
+  const raw = isRecord(params) ? params.input : undefined
+  if (raw === undefined) {
+    return null
+  }
+  try {
+    return stringifyJsonWithinByteLimit(raw, ZCODE_PROMPT_MAX_INPUT_BYTES).serialized
+  } catch (error) {
+    if (!(error instanceof JsonStringifyByteLimitError)) {
+      return ZCODE_PROMPT_UNSERIALIZABLE_INPUT
+    }
+  }
+  let serialized: unknown
+  try {
+    serialized = JSON.stringify(raw)
+  } catch {
+    return ZCODE_PROMPT_UNSERIALIZABLE_INPUT
+  }
+  if (typeof serialized !== 'string') {
+    return ZCODE_PROMPT_UNSERIALIZABLE_INPUT
+  }
+  // Re-encode oversized input so the UI still sees a prefix of what was asked.
+  const suffixBytes = Buffer.byteLength(ZCODE_PROMPT_INPUT_TRUNCATED_SUFFIX, 'utf8')
+  const head = Buffer.from(serialized, 'utf8')
+    .subarray(0, ZCODE_PROMPT_MAX_INPUT_BYTES - suffixBytes)
+    .toString('utf8')
+  return `${head}${ZCODE_PROMPT_INPUT_TRUNCATED_SUFFIX}`
 }
 
 export function readZcodePermissionOptions(params: unknown): ZcodePromptOption[] | null {
@@ -154,6 +198,7 @@ type ZcodePromptRegistryEntryBounds = {
   toolCallId: string | null
   toolName: string | null
   reason: string
+  input: string | null
   options: readonly ZcodePromptOption[]
   questions: readonly ZcodePromptQuestion[]
   answers: ReadonlyMap<string, string>
@@ -166,6 +211,9 @@ export function zcodePromptRegistryEntryBytes(prompt: ZcodePromptRegistryEntryBo
   }
   for (const value of [prompt.sessionId, prompt.requestId, prompt.method, prompt.reason]) {
     add(value)
+  }
+  if (prompt.input) {
+    add(prompt.input)
   }
   if (prompt.turnId) {
     add(prompt.turnId)

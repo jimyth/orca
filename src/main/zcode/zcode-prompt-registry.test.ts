@@ -3,6 +3,7 @@ import { ZCODE_INTERACTION_METHODS } from './zcode-protocol'
 import {
   MAX_ZCODE_PROMPT_REGISTRY_BYTES,
   MAX_ZCODE_PROMPT_REGISTRY_ENTRIES,
+  ZCODE_PROMPT_MAX_INPUT_BYTES,
   ZcodePromptRegistry,
   type ZcodePendingPrompt,
   type ZcodePromptClaim
@@ -14,6 +15,7 @@ type PermissionRequestOverrides = {
   turnId?: string | null
   toolCallId?: string
   reason?: string
+  input?: unknown
 }
 
 function permissionRequest(
@@ -31,6 +33,7 @@ function permissionRequest(
       toolName: 'Bash',
       reason: overrides.reason ?? `run command ${index}`,
       riskLevel: 'medium',
+      ...(overrides.input !== undefined && { input: overrides.input }),
       options: [
         {
           optionId: 'allow_once',
@@ -279,14 +282,9 @@ describe('ZcodePromptRegistry', () => {
     expect(registry.find('sess-1', 'req-new')).not.toBeNull()
   })
 
-  it('retains malformed interaction params as bounded, empty prompt surfaces', () => {
+  it('retains malformed user-input questions as bounded prompt surfaces', () => {
     const registry = new ZcodePromptRegistry()
 
-    const permission = registry.register({
-      id: 'server-1',
-      method: ZCODE_INTERACTION_METHODS.requestPermission,
-      params: { requestId: 'req-1', sessionId: 'sess-1', options: 'not-an-array' }
-    })
     const userInput = registry.register({
       id: 'server-2',
       method: ZCODE_INTERACTION_METHODS.requestUserInput,
@@ -306,8 +304,130 @@ describe('ZcodePromptRegistry', () => {
       }
     })
 
-    expect(permission?.options).toEqual([])
     expect(userInput?.questions[0]?.options).toEqual([{ value: 'yes', label: 'Yes' }])
+  })
+
+  it('refuses permission prompts whose options leave nothing answerable', () => {
+    const registry = new ZcodePromptRegistry()
+
+    // Schema demands options min(1): the official host answers a failed parse
+    // with -32602, so an unanswerable set must not register a dead prompt.
+    expect(
+      registry.register({
+        id: 'server-1',
+        method: ZCODE_INTERACTION_METHODS.requestPermission,
+        params: { requestId: 'req-empty', sessionId: 'sess-1', options: [] }
+      })
+    ).toBeNull()
+    expect(
+      registry.register({
+        id: 'server-2',
+        method: ZCODE_INTERACTION_METHODS.requestPermission,
+        params: { requestId: 'req-missing', sessionId: 'sess-1' }
+      })
+    ).toBeNull()
+    expect(
+      registry.register({
+        id: 'server-3',
+        method: ZCODE_INTERACTION_METHODS.requestPermission,
+        params: { requestId: 'req-malformed', sessionId: 'sess-1', options: 'not-an-array' }
+      })
+    ).toBeNull()
+    expect(
+      registry.register({
+        id: 'server-4',
+        method: ZCODE_INTERACTION_METHODS.requestPermission,
+        params: {
+          requestId: 'req-garbage',
+          sessionId: 'sess-1',
+          options: [{ optionId: '', kind: 'allow', name: 'Broken' }]
+        }
+      })
+    ).toBeNull()
+    expect(registry.sizes).toEqual({ prompts: 0 })
+
+    expect(registry.register(permissionRequest(5, { requestId: 'req-ok' }))).not.toBeNull()
+  })
+
+  it('retains the permission input as serialized JSON', () => {
+    const registry = new ZcodePromptRegistry()
+    const input = { command: 'rm -rf /tmp/orca-spike', cwd: '/tmp' }
+    const prompt = registerPermission(registry, 1, { requestId: 'req-1', input })
+
+    if (prompt.input === null) {
+      throw new Error('Fixture prompt retained no input')
+    }
+    expect(JSON.parse(prompt.input)).toEqual(input)
+
+    const withoutInput = registerPermission(registry, 2, { requestId: 'req-2' })
+    expect(withoutInput.input).toBeNull()
+
+    const userInput = registry.register(userInputRequest(3, 'user-req-3'))
+    expect(userInput?.input).toBeNull()
+  })
+
+  it('truncates oversized permission input to the input byte cap', () => {
+    const registry = new ZcodePromptRegistry()
+    const prompt = registerPermission(registry, 1, {
+      requestId: 'req-1',
+      input: { command: 'x'.repeat(ZCODE_PROMPT_MAX_INPUT_BYTES * 2) }
+    })
+
+    if (prompt.input === null) {
+      throw new Error('Fixture prompt retained no input')
+    }
+    expect(Buffer.byteLength(prompt.input, 'utf8')).toBeLessThanOrEqual(
+      ZCODE_PROMPT_MAX_INPUT_BYTES
+    )
+    expect(prompt.input.endsWith('…[truncated]')).toBe(true)
+    expect(prompt.input.startsWith('{"command":"xxxx')).toBe(true)
+  })
+
+  it('falls back to a placeholder for unserializable input', () => {
+    const registry = new ZcodePromptRegistry()
+    const circular: Record<string, unknown> = { name: 'loop' }
+    circular.self = circular
+
+    const bigint = registerPermission(registry, 1, { requestId: 'req-bigint', input: 10n })
+    const looped = registerPermission(registry, 2, { requestId: 'req-loop', input: circular })
+
+    expect(bigint.input).toBe('[unserializable zcode permission input]')
+    expect(looped.input).toBe('[unserializable zcode permission input]')
+  })
+
+  it('rejects a resend that reuses a requestId under a different method', () => {
+    const registry = new ZcodePromptRegistry()
+    const first = registerPermission(registry, 1, { requestId: 'req-1' })
+
+    const mismatched = registry.register({
+      id: 'server-99',
+      method: ZCODE_INTERACTION_METHODS.requestUserInput,
+      params: { requestId: 'req-1', sessionId: 'sess-1', questions: [] }
+    })
+
+    expect(mismatched).toBeNull()
+    expect(first.frameId).toBe('server-1')
+    expect(registry.sizes).toEqual({ prompts: 1 })
+  })
+
+  it('re-inserts a resent prompt so FIFO eviction spares the active entry', () => {
+    const registry = new ZcodePromptRegistry()
+    registerPermission(registry, 1, { requestId: 'req-first' })
+    registerPermission(registry, 2, { requestId: 'req-second' })
+    for (let index = 3; index <= MAX_ZCODE_PROMPT_REGISTRY_ENTRIES; index += 1) {
+      registerPermission(registry, index)
+    }
+    expect(registry.sizes).toEqual({ prompts: MAX_ZCODE_PROMPT_REGISTRY_ENTRIES })
+
+    registry.register(permissionRequest(5_000, { requestId: 'req-first' }))
+    // Registering past the cap evicts by FIFO order; the resend must have
+    // moved req-first to the fresh end, so req-second is now the oldest.
+    registry.register(permissionRequest(5_001, { requestId: 'req-new' }))
+
+    expect(registry.find('sess-1', 'req-first')).not.toBeNull()
+    expect(registry.find('sess-1', 'req-second')).toBeNull()
+    expect(registry.find('sess-1', 'req-new')).not.toBeNull()
+    expect(registry.sizes).toEqual({ prompts: MAX_ZCODE_PROMPT_REGISTRY_ENTRIES })
   })
 
   it('releases an evicted claim only when its exact session turn completes', async () => {

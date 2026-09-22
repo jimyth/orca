@@ -3,6 +3,7 @@ import {
   MAX_ZCODE_PROMPT_REGISTRY_BYTES,
   MAX_ZCODE_PROMPT_REGISTRY_ENTRIES,
   readZcodeParamString,
+  readZcodePermissionInput,
   readZcodePermissionOptions,
   readZcodeUserInputQuestions,
   type ZcodePromptOption,
@@ -13,6 +14,7 @@ import {
 export {
   MAX_ZCODE_PROMPT_REGISTRY_BYTES,
   MAX_ZCODE_PROMPT_REGISTRY_ENTRIES,
+  ZCODE_PROMPT_MAX_INPUT_BYTES,
   zcodePromptRegistryEntryBytes
 } from './zcode-prompt-registry-bounds'
 
@@ -28,6 +30,8 @@ export type ZcodePendingPrompt = {
   toolName: string | null
   reason: string
   riskLevel: string | null
+  /** Serialized permission input (params.input), truncated to the input byte cap. */
+  input: string | null
   options: readonly ZcodePromptOption[]
   questions: readonly ZcodePromptQuestion[]
   answers: Map<string, string>
@@ -87,16 +91,27 @@ export class ZcodePromptRegistry {
     const address = this.address(sessionId, requestId)
     const existing = this.byAddress.get(address)
     if (existing) {
+      // A frame reusing a live requestId under a different method is malformed
+      // and must not refresh the wire id of the prompt actually pending.
+      if (existing.method !== request.method) {
+        return null
+      }
       existing.frameId = request.id
+      // Mirror codex's delete+set: re-insertion keeps a resent prompt at the
+      // fresh end of the FIFO eviction order instead of aging out mid-ask.
+      this.byAddress.delete(address)
+      this.byAddress.set(address, existing)
       return existing
     }
-    const options =
-      request.method === ZCODE_INTERACTION_METHODS.requestPermission
-        ? readZcodePermissionOptions(request.params)
-        : []
-    if (options === null) {
+    const isPermission = request.method === ZCODE_INTERACTION_METHODS.requestPermission
+    const options = isPermission ? readZcodePermissionOptions(request.params) : []
+    // Why: the schema demands permission options min(1); an empty set (missing,
+    // malformed, or all-invalid entries) leaves a prompt nothing to answer with,
+    // so refuse registration — the caller turns the refusal into -32602.
+    if (options === null || (isPermission && options.length === 0)) {
       return null
     }
+    const input = isPermission ? readZcodePermissionInput(request.params) : null
     const questions =
       request.method === ZCODE_INTERACTION_METHODS.requestUserInput
         ? readZcodeUserInputQuestions(request.params)
@@ -118,6 +133,7 @@ export class ZcodePromptRegistry {
         readZcodeParamString(request.params, 'prompt') ??
         '',
       riskLevel: typeof riskLevelRaw === 'string' ? riskLevelRaw : null,
+      input,
       options,
       questions,
       answers: new Map()
