@@ -11,6 +11,7 @@ import {
   type MobileWebShellRuntime
 } from './mobile-web-shell-runtime'
 import { readMobileWebShellReachability } from './mobile-web-shell-reachability'
+import { shellPageBackClaimed } from './shell-page-back-claim'
 import { shellPageFrame, type ShellPageFrame } from './shell-page-frame'
 import {
   createMobileWebShellSession,
@@ -44,6 +45,8 @@ export type MobileWebShellSessionView = {
   readonly reportPageReady: (reports: readonly string[]) => void
   /** The page has a frame on screen. Ignored for a page that never said it would report one. */
   readonly reportPagePainted: () => void
+  /** The page took the device Back key, or let it go. */
+  readonly reportPageBackClaim: (claimed: boolean) => void
   /**
    * Whether the page has handshaken on this session, which the bridge host is rebuilt against.
    *
@@ -54,6 +57,9 @@ export type MobileWebShellSessionView = {
   /** How far this document has got towards being something to show. Projected for the same
    *  reason as `pageReady`: `page-painted` moves nothing else. */
   readonly pageFrame: ShellPageFrame
+  /** Whether the shell should take Back off the navigator. Projected for the same reason as
+   *  `pageReady`: a claim moves nothing else, so no other value would re-render to carry it. */
+  readonly backClaimed: boolean
 }
 
 /**
@@ -83,6 +89,7 @@ export function useMobileWebShellSession(args: {
   const [state, setState] = useState(sessionRef.current.state)
   const [pageReady, setPageReady] = useState(sessionRef.current.pageReady)
   const [pageFrame, setPageFrame] = useState(() => shellPageFrame(sessionRef.current))
+  const [backClaimed, setBackClaimed] = useState(() => shellPageBackClaimed(sessionRef.current))
   const hostKey = useMemo(() => deriveHostCacheKey(hostId), [hostId])
   const startedAtRef = useRef(runtime.now())
   // Bumped by anything that invalidates work in flight; every dispatch out of an effect checks it.
@@ -105,6 +112,7 @@ export function useMobileWebShellSession(args: {
     setState(stepped.session.state)
     setPageReady(stepped.session.pageReady)
     setPageFrame(shellPageFrame(stepped.session))
+    setBackClaimed(shellPageBackClaimed(stepped.session))
     for (const effect of stepped.effects) {
       // Every effect of a step belongs to the flow that step produced, and its result carries that
       // number back, so a flow the session has since restarted reports into nothing.
@@ -142,6 +150,14 @@ export function useMobileWebShellSession(args: {
           // under are already on the session, so all a refused or failed write costs is the
           // freshness of the next offline verdict, never the generation being opened here.
           await store.persistActiveManifest(hostKey, effect.manifest).catch(() => undefined)
+          return
+        case 'record-update-failure':
+          // Stamped here because the reducer holds neither: the host is the mount's, the time the
+          // runtime's. Reports nothing, and the store swallows its own failure.
+          await store.recordUpdateFailure({ ...effect.failure, hostId, at: runtime.now() })
+          return
+        case 'forget-update-failures':
+          await store.forgetHostUpdateFailures(hostId)
           return
         case 'open-cache':
           send({ type: 'cache-read', flow, generation: await openCache(store, hostKey) })
@@ -185,7 +201,7 @@ export function useMobileWebShellSession(args: {
         }
       }
     },
-    [client, dispatch, hostKey, runtime]
+    [client, dispatch, hostId, hostKey, runtime]
   )
   // Written after the commit, never during render: React may replay or discard a render, and a
   // closure from one that never committed would run effects for a session that never existed.
@@ -267,6 +283,13 @@ export function useMobileWebShellSession(args: {
     dispatch(epochRef.current, { type: 'page-painted' })
   }, [dispatch])
 
+  const reportPageBackClaim = useCallback(
+    (claimed: boolean) => {
+      dispatch(epochRef.current, { type: 'page-back-claim', claimed })
+    },
+    [dispatch]
+  )
+
   return {
     state,
     pageReady,
@@ -280,6 +303,8 @@ export function useMobileWebShellSession(args: {
     reportDocumentStarted,
     reportDocumentLoaded,
     reportPageReady,
-    reportPagePainted
+    reportPagePainted,
+    reportPageBackClaim,
+    backClaimed
   }
 }
