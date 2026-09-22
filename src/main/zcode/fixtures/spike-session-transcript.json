@@ -1,0 +1,20 @@
+{
+  "zcodeVersion": "0.16.9",
+  "zcodeSourceCommit": "872ad96 (2026-09-21, ZCode repo)",
+  "capturedAt": "2026-09-23T03:00:41+08:00",
+  "argv": ["app-server", "--stdio"],
+  "framing": "NDJSON over stdio, LF-delimited, one JSON object per line",
+  "workspace": { "workspacePath": "/tmp/zcode-spike-ws", "workspaceKey": "spike" },
+  "modelSelection": {
+    "providerId": "bigmodel-spike",
+    "modelId": "GLM-5.3",
+    "options": { "reasoningLevel": "max" }
+  },
+  "prompt": "Create a file named spike.txt with the text hi, then read it back.",
+  "regenerate": "ZCODE_BIN=<zcode.cjs> ZCODE_PROVIDER_ID=bigmodel-spike ZCODE_MODEL_ID=GLM-5.3 node scripts/spike/zcode-app-server-transcript.mjs src/main/zcode/fixtures/spike-session-transcript.ndjson — requires a personal provider entry (api-key, anthropic-messages) in ~/.zcode/v2/provider_config.json; app-server's Provider Registry loads providers only from the builtin template catalog plus the personal file, not from ~/.zcode/cli/config.json",
+  "transcript": {
+    "lines": 280,
+    "directionMarker": "each line gains a `direction` field ('in' from server, 'out' from client) ahead of the raw frame",
+    "turnOutcome": "turn.completed with resultType=success; spike.txt created and read back"
+  }
+}
