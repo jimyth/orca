@@ -94,8 +94,8 @@ export type AgentLaunchIntent = {
    * `background` means the caller owns it, so the host skips its reveal and the structured route
    * creates its chat without activating it; absent keeps the host's reveal.
    *
-   * Presentation, never placement: it says who reveals, and nothing about which group, what order,
-   * or what takes focus. That decision never leaves the client that draws tabs.
+   * Presentation, never placement: it says who reveals, and nothing about which group, which
+   * anchor, or what order. Placement never leaves the client that draws tabs.
    *
    * Deliberately NOT a route input, and deliberately not part of the launch's fingerprint — the
    * agent that ends up running is the same either way.
