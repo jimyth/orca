@@ -41,7 +41,10 @@ export const TUI_AGENT_AUTO_PICK_ORDER = [
   'rovo',
   'hermes',
   'devin',
-  'openclaw'
+  'openclaw',
+  // Why: not a default pick candidate, but the dashboard's `enabled.includes(preferred)`
+  // requires the array's element type to cover the full TuiAgent union.
+  'zcode'
 ] as const satisfies readonly TuiAgent[]
 
 // Why: fresh installs should expose Claude Agent Teams in agent pickers; the

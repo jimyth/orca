@@ -312,6 +312,11 @@ const TUI_AGENT_CONFIG_SOURCE: Record<TuiAgent, TuiAgentConfigSource> = {
     detectCmd: 'devin',
     // Why: `devin -- <prompt>` auto-submits immediately (docs.devin.ai/cli), so start the REPL with no argv prompt.
     promptInjectionMode: 'stdin-after-start'
+  },
+  zcode: {
+    detectCmd: 'zcode',
+    // Why: unknown positional argv makes zcode exit with "Unknown command", so inject the prompt over stdin after startup.
+    promptInjectionMode: 'stdin-after-start'
   }
 }
 
