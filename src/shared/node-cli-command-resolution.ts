@@ -308,6 +308,10 @@ export function resolveClaudeCommand(options: ResolveCommandOptions = {}): strin
   return resolveCliCommand('claude', options)
 }
 
+export function resolveZcodeCommand(options: ResolveCommandOptions = {}): string {
+  return resolveCliCommand('zcode', options)
+}
+
 // Why: Win32 resolves env names case-insensitively and object order preserves
 // the block order, so the entry the child will actually read is the FIRST
 // case-insensitive match — not necessarily `Path` or `PATH`. Reading a narrower

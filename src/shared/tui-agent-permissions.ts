@@ -29,7 +29,12 @@ export const YOLO_TUI_AGENT_ARGS: Partial<Record<TuiAgent, string>> = {
   devin: '--permission-mode bypass --respect-workspace-trust false',
   ante: '--yolo',
   trae: '--yolo',
-  droid: '--auto high'
+  droid: '--auto high',
+  // Why the joined spelling: the bypass check compares one token, and a two-word
+  // `--mode yolo` only matches when the flag is quoted as one. zcode's CLI accepts
+  // `--mode=yolo` (verified against its parseArgs validation), so the single-token
+  // form is what both the TUI and the permission check read.
+  zcode: '--mode=yolo'
 }
 
 export const YOLO_TUI_AGENT_ENV: Partial<Record<TuiAgent, Record<string, string>>> = {
