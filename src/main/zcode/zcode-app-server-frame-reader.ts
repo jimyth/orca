@@ -11,6 +11,10 @@ import {
 import { ZcodeAppServerProtocolError } from './zcode-app-server-connection-errors'
 import { parseZcodeProtocolFrame, type ZcodeProtocolFrame } from './zcode-protocol'
 
+// Far above any legal protocol frame; a runaway server's unterminated output
+// must not accumulate in the main process without bound.
+export const ZCODE_APP_SERVER_MAX_LINE_BYTES = 256 * 1024 * 1024
+
 const FRAME_DETAIL_MAX_CHARS = 400
 
 type ReaderStream = Pick<Readable, 'on' | 'pause' | 'resume' | 'setEncoding'>
@@ -52,7 +56,7 @@ export function createZcodeFrameReader(input: {
           : `frame exceeded the ${rejected.maxLineBytes}-byte limit`
       )
     },
-    { maxLineBytes: Number.POSITIVE_INFINITY, shouldPause: () => paused }
+    { maxLineBytes: ZCODE_APP_SERVER_MAX_LINE_BYTES, shouldPause: () => paused }
   )
 
   input.stdout.setEncoding('utf8').on('data', (chunk: string) => {

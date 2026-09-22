@@ -265,6 +265,30 @@ describe('openZcodeAppServerConnection', () => {
     await connection.close()
   }, 10_000)
 
+  it('rejects in-flight requests when storage fails after ready', async () => {
+    const { child, spawnImpl, written } = stubChild()
+    const connection = await openZcodeAppServerConnection(
+      { command: 'zcode', args: ['app-server'] },
+      {},
+      spawnImpl
+    )
+
+    child.stdout.write(storageLine('ready', 'a1', 1))
+    const inFlight = rejection(connection.request('test/no-reply'))
+    // The request must already sit in the pending map, not behind the gate,
+    // so the failed frame exercises markTerminal -> requests.fail.
+    await vi.waitFor(() =>
+      expect(written.some((frame) => frame.method === 'test/no-reply')).toBe(true)
+    )
+
+    child.stdout.write(storageLine('failed', 'a2', 2, 'SQLITE_BUSY'))
+
+    const error = await inFlight
+    expect(error.message).toContain('SQLite startup failed: SQLITE_BUSY')
+    expect(connection.closed).toBe(true)
+    await expect(connection.close()).resolves.toBe(true)
+  })
+
   it('times out one request without ending the connection', async () => {
     const connection = await openFakeServer()
 
