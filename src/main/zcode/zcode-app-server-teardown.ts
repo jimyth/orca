@@ -1,18 +1,14 @@
-// Simplified inline teardown for the zcode app-server child: SIGTERM, then
-// SIGKILL after a bounded grace. Replaced wholesale by the shared zcode
-// process-tree killer once that lands — do not grow this module.
+// Connection adapter over the shared zcode process-tree killer: the connection
+// owns the root's exit proof, the killer owns the whole-tree reaping.
 
 import type { ZcodeAppServerChild } from './zcode-app-server-connection-types'
-
-const SIGTERM_EXIT_MS = 2_000
-const SIGKILL_EXIT_MS = 2_000
+import { killZcodeProcessTree } from './zcode-app-server-process-teardown'
 
 export type ZcodeChildReaper = {
-  /** Signals the child until its exit is observed or both deadlines expire. */
+  /** Signals the child's whole tree until exit is observed or the deadlines expire. */
   kill: () => Promise<void>
 }
 
-// Inline twin of the codex exit deadline; goes away with the tree killer.
 export async function waitForExitUntil(deadline: Promise<void>, timeoutMs: number): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<void>((resolve) => {
@@ -32,22 +28,12 @@ export function createZcodeChildReaper(input: {
   exitPromise: Promise<void>
   hasExited: () => boolean
 }): ZcodeChildReaper {
-  function signalChild(signal: NodeJS.Signals): void {
-    try {
-      input.child.kill(signal)
-    } catch {
-      // Already gone; the exit proof is what matters.
-    }
-  }
-
   return {
     async kill() {
-      signalChild('SIGTERM')
-      await waitForExitUntil(input.exitPromise, SIGTERM_EXIT_MS)
-      if (!input.hasExited()) {
-        signalChild('SIGKILL')
-        await waitForExitUntil(input.exitPromise, SIGKILL_EXIT_MS)
-      }
+      await killZcodeProcessTree(input.child, {
+        exitPromise: input.exitPromise,
+        hasExited: input.hasExited
+      })
     }
   }
 }
