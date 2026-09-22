@@ -26,6 +26,7 @@ import {
   type ExecutionHostId
 } from '../../shared/execution-host'
 import { STILL_LIVE_DETAIL_PREFIX } from '../../shared/worktree/removal'
+import type { AgentSessionHandleProvider } from '../../shared/agent-session-provider-handle'
 import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
 import { observeStructuredWorker } from './structured-worker-authority'
 import { closeStructuredAgentSessionChild } from './structured-agent-session-close'
@@ -35,7 +36,7 @@ import type { OrcaRuntimeService } from './orca-runtime'
 
 export type StructuredSessionInWorkspace = {
   sessionId: string
-  agent: 'claude' | 'codex'
+  agent: AgentSessionHandleProvider
 }
 
 export type UnclosedStructuredSession = StructuredSessionInWorkspace & {

@@ -1,5 +1,6 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
+import type { AgentSessionHandleProvider } from '../../shared/agent-session-provider-handle'
 import type { AgentSessionExecutionLocation } from '../../shared/agent-session-record'
 import { agentSessionExecutionLocationsEqual } from '../../shared/agent-session-record'
 import type { AgentSessionAttachParams } from '../native-chat/agent-session-wire/structured-agent-session-attach'
@@ -22,7 +23,7 @@ type AdoptionSettings = {
 export function resolveCommittedStructuredAgentSessionAdoptionIntent(input: {
   host: StructuredAgentSessionHost | null
   envelope: { sessionId: string; clientOperationId: string }
-  agent: 'claude' | 'codex'
+  agent: AgentSessionHandleProvider
   callerKey?: string
   resumeFrom?: { providerSessionId: string }
   location: AgentSessionExecutionLocation
@@ -63,7 +64,7 @@ export function resolveCommittedStructuredAgentSessionAdoptionIntent(input: {
 export async function resolveStructuredAgentSessionAdoptionForCreate(input: {
   host: StructuredAgentSessionHost | null
   settings: AdoptionSettings
-  agent: 'claude' | 'codex'
+  agent: AgentSessionHandleProvider
   providerSessionId: string
   selfSessionId: string
   selectedAccountHomePath: string
@@ -97,7 +98,7 @@ export async function resolveStructuredAgentSessionAdoptionForCreate(input: {
 /** Recognised adoption homes, most-preferred first. */
 function structuredAdoptionAccountHomeCandidates(input: {
   settings: AdoptionSettings
-  agent: 'claude' | 'codex'
+  agent: AgentSessionHandleProvider
   selectedAccountHomePath: string
 }): string[] {
   if (input.agent === 'claude') {

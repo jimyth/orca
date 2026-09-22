@@ -1,4 +1,5 @@
 import type { AgentStatusEntry } from './agent-status-types'
+import type { AgentSessionHandleProvider } from './agent-session-provider-handle'
 import type { BrowserCertificateFailure, BrowserLoadError } from './browser-workspace-types'
 import type { RuntimeBrowserPlacement } from './runtime-browser-placement'
 import type { TerminalColorOverrides } from './terminal-color-overrides'
@@ -97,7 +98,7 @@ export type RuntimeMobileSessionAgentTab = {
   title: string
   sessionId: string
   replacesSessionId?: string
-  agent: 'claude' | 'codex'
+  agent: AgentSessionHandleProvider
   color?: string | null
   isPinned?: boolean
   isActive: boolean

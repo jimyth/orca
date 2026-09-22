@@ -17,6 +17,7 @@ import { getLocalProjectWorktreeGitOptions } from '../project-runtime-git-option
 import type { AgentSessionAttachParams } from '../native-chat/agent-session-wire/structured-agent-session-attach'
 import { getSystemCodexHomePath } from '../codex/codex-home-paths'
 import { resolveTuiAgentLaunchEnv } from '../../shared/tui-agent-launch-defaults'
+import type { AgentSessionHandleProvider } from '../../shared/agent-session-provider-handle'
 import { resolveStructuredLaunchSeedOptions } from '../../shared/native-chat-session-option-defaults'
 import { hasPersistedStructuredAgentSessionStore as hasPersistedStructuredAgentSessionStoreOnDisk } from './structured-agent-session-runtime'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
@@ -57,7 +58,7 @@ export class OrcaRuntimeWithResolveRecoveredStructuredTuiTranscript extends Orca
 
   async getStructuredAgentSessionCreateSupport(
     worktreeSelector: string,
-    agent: 'claude' | 'codex'
+    agent: AgentSessionHandleProvider
   ): Promise<{ supported: boolean; reason?: 'agent' | 'remote' | 'wsl' }> {
     const location = await this.resolveStructuredAgentSessionLocation(worktreeSelector)
     return resolveStructuredAgentSessionCreateSupport({
@@ -66,7 +67,11 @@ export class OrcaRuntimeWithResolveRecoveredStructuredTuiTranscript extends Orca
       adapterSupportsCreate:
         agent === 'claude'
           ? supportsClaudeStructuredLocation(location)
-          : supportsCodexStructuredLocation(location),
+          : agent === 'codex'
+            ? supportsCodexStructuredLocation(location)
+            : // ZCode rides the app-server lane; its create support lands with the adapter, so a
+              // create must fail closed instead of borrowing Codex's location verdict.
+              false,
       getSettings: () => this.requireStore().getSettings()
     })
   }
@@ -125,10 +130,15 @@ export class OrcaRuntimeWithResolveRecoveredStructuredTuiTranscript extends Orca
   async resolveStructuredAgentSessionCreateIntent(input: {
     envelope: { sessionId: string; clientOperationId: string }
     worktree: string
-    agent: 'claude' | 'codex'
+    agent: AgentSessionHandleProvider
     callerKey?: string
     resumeFrom?: { providerSessionId: string }
   }): Promise<AgentSessionAttachParams> {
+    if (input.agent === 'zcode') {
+      // ZCode creates arrive over the app-server adapter, not the claude/codex account-home
+      // resolution below; until that lands, fail closed rather than resolve a Codex home.
+      throw new Error('structured_agent_session_unsupported')
+    }
     if (input.agent === 'claude') {
       return this.resolveStructuredAgentSessionIntent(input, async ({ launchEnv, location }) => {
         return (
@@ -160,7 +170,7 @@ export class OrcaRuntimeWithResolveRecoveredStructuredTuiTranscript extends Orca
     input: {
       envelope: { sessionId: string; clientOperationId: string }
       worktree: string
-      agent: 'claude' | 'codex'
+      agent: AgentSessionHandleProvider
       callerKey?: string
       resumeFrom?: { providerSessionId: string }
     },

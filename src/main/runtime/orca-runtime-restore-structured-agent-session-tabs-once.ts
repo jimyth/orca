@@ -11,6 +11,7 @@ import type {
   RuntimeMobileSessionTabsSnapshot,
   RuntimeRepoSearchRefs
 } from '../../shared/runtime-types'
+import type { AgentSessionHandleProvider } from '../../shared/agent-session-provider-handle'
 import { getHeadlessMobileSessionGroupId } from './mobile-session-layout-projection'
 import { DEFAULT_REPO_SEARCH_REFS_LIMIT } from './orca-runtime-postlude'
 import type { Repo } from '../../shared/repo-types'
@@ -91,7 +92,7 @@ export class OrcaRuntimeWithRestoreStructuredAgentSessionTabsOnce extends OrcaRu
   async publishStructuredAgentSessionTab(input: {
     workspaceId: string
     sessionId: string
-    agent: 'claude' | 'codex'
+    agent: AgentSessionHandleProvider
     activate: boolean
     notify?: boolean
     replacesSessionId?: string

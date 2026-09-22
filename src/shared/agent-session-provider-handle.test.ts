@@ -13,12 +13,16 @@ import {
   type AgentSessionProviderHandle,
   type AgentSessionProviderHandleLink
 } from './agent-session-provider-handle'
+import { isAgentSessionRecord } from './agent-session-record'
+import { agentSessionRecordFixture } from './agent-session-record.test-fixture'
 
 const CLAUDE: AgentSessionProviderHandle = {
   provider: 'claude',
   sessionId: 'sess-1',
   leafUuid: 'leaf-1'
 }
+
+const ZCODE: AgentSessionProviderHandle = { provider: 'zcode', sessionId: 'sess_1' }
 
 function link(overrides: Partial<AgentSessionProviderHandleLink> = {}) {
   return {
@@ -389,5 +393,120 @@ describe('adopted chain heads', () => {
 
   it('accepts an adopted head as a persisted chain', () => {
     expect(isAgentSessionProviderHandleChain([adopted()])).toBe(true)
+  })
+})
+
+describe('zcode handles', () => {
+  // ZCode's session id (sess_-prefixed) is the identity root; there is no Claude-style branch
+  // cursor, so the whole key and the root coincide.
+  it('recognizes zcode as a handle provider', () => {
+    expect(isAgentSessionHandleProvider('zcode')).toBe(true)
+  })
+
+  it('keys a ZCode handle by session id alone, so the key is the root', () => {
+    expect(agentSessionProviderHandleKey(ZCODE)).toBe('zcode:"sess_1"')
+    expect(agentSessionProviderHandleRoot(ZCODE)).toBe('zcode:"sess_1"')
+    expect(
+      agentSessionProviderHandlesEqual(ZCODE, { provider: 'zcode', sessionId: 'sess_2' })
+    ).toBe(false)
+  })
+
+  it('rejects malformed ZCode handles', () => {
+    expect(isAgentSessionProviderHandle(ZCODE)).toBe(true)
+    expect(isAgentSessionProviderHandle({ provider: 'zcode', sessionId: '' })).toBe(false)
+    expect(isAgentSessionProviderHandle({ provider: 'zcode', sessionId: 'sess_1 ' })).toBe(false)
+    expect(isAgentSessionProviderHandle({ provider: 'zcode', sessionId: 'x'.repeat(513) })).toBe(
+      false
+    )
+    expect(isAgentSessionProviderHandle({ provider: 'zcode' })).toBe(false)
+    expect(isAgentSessionProviderHandle({ provider: 'zcode', threadId: 'thread-1' })).toBe(false)
+  })
+
+  it('appends a ZCode resume on the same session id and refuses one that moved', () => {
+    const adoptedHead = link({
+      linkId: 'zcode-1-sess-1',
+      origin: 'adopted',
+      handle: ZCODE
+    })
+    // The session id is the whole identity, so a same-fence re-proof is a retry; a moved fence is
+    // a genuine re-acquisition.
+    expect(
+      appendAgentSessionProviderHandleLink([adoptedHead], {
+        ...link({
+          linkId: 'zcode-1-sess-1-retry',
+          origin: 'resumed',
+          handle: ZCODE,
+          mintedAtFence: 1
+        })
+      })
+    ).toEqual([adoptedHead])
+    expect(
+      appendAgentSessionProviderHandleLink(
+        [adoptedHead],
+        link({
+          linkId: 'zcode-1-sess-1-resume',
+          origin: 'resumed',
+          handle: ZCODE,
+          mintedAtFence: 2
+        })
+      )
+    ).toHaveLength(2)
+    expect(() =>
+      appendAgentSessionProviderHandleLink(
+        [adoptedHead],
+        link({
+          linkId: 'zcode-1-sess-2',
+          origin: 'resumed',
+          handle: { provider: 'zcode', sessionId: 'sess_2' },
+          mintedAtFence: 2
+        })
+      )
+    ).toThrow('agent_session_provider_handle_forked')
+  })
+
+  it('records a ZCode fork only with a new session id and the seed key', () => {
+    const chain = [link({ linkId: 'zcode-1', origin: 'created', handle: ZCODE })]
+    const forked = link({
+      linkId: 'zcode-2',
+      origin: 'forked',
+      handle: { provider: 'zcode', sessionId: 'sess_2' },
+      mintedAtFence: 2,
+      forkedFromKey: agentSessionProviderHandleKey(ZCODE)
+    })
+    expect(appendAgentSessionProviderHandleLink(chain, forked)).toHaveLength(2)
+    expect(() =>
+      appendAgentSessionProviderHandleLink(chain, { ...forked, forkedFromKey: 'zcode:"other"' })
+    ).toThrow('agent_session_provider_handle_invalid')
+  })
+
+  it('round-trips a ZCode chain through persistence', () => {
+    const chain = [
+      link({ linkId: 'zcode-1', origin: 'created', handle: ZCODE }),
+      link({
+        linkId: 'zcode-2',
+        origin: 'resumed',
+        handle: ZCODE,
+        mintedAtFence: 2
+      })
+    ]
+    expect(isAgentSessionProviderHandleChain(JSON.parse(JSON.stringify(chain)))).toBe(true)
+  })
+
+  it('admits a durable record whose provider and chain head are zcode', () => {
+    const record = {
+      ...agentSessionRecordFixture(),
+      provider: 'zcode',
+      providerHandleChain: [
+        {
+          linkId: 'link-1',
+          origin: 'created',
+          mintedAtFence: 7,
+          observedAt: 1_000,
+          handle: ZCODE
+        }
+      ]
+    }
+    expect(isAgentSessionRecord(record)).toBe(true)
+    expect(isAgentSessionRecord({ ...record, provider: 'claude' })).toBe(false)
   })
 })

@@ -7,6 +7,7 @@
  * pinned to another execution host is no longer this runtime's structured worker.
  */
 
+import type { AgentSessionHandleProvider } from '../../shared/agent-session-provider-handle'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import type { RuntimeTerminalState } from '../../shared/runtime-types'
 import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
@@ -69,7 +70,9 @@ export function resolveStructuredWorkerAuthority(
  * relabel every restarted Codex worker as Claude, permanently, because the startup release
  * reconciler stamps the frozen journal archive with whatever it is told here.
  */
-export function structuredWorkerAgent(identity: StructuredWorkerIdentity): 'claude' | 'codex' {
+export function structuredWorkerAgent(
+  identity: StructuredWorkerIdentity
+): AgentSessionHandleProvider {
   return (
     identity.agent ?? readStructuredAgentSessionRecord(identity.sessionId)?.provider ?? 'claude'
   )

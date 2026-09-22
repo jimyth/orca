@@ -7,12 +7,13 @@
 
 import type { AgentSessionOperationRow } from '../../shared/agent-session-operation-ledger'
 import type { AgentSessionProviderHandle } from '../../shared/agent-session-journal-types'
+import type { AgentSessionHandleProvider } from '../../shared/agent-session-provider-handle'
 import type { AgentSessionLease, AgentSessionRecord } from '../../shared/agent-session-record'
 import { agentSessionLeaseAdmitsWriter } from '../../shared/agent-session-lease-adjudication'
 
 export type StructuredAgentSessionAdoptionOwnership = {
   sessionId: string
-  provider: 'claude' | 'codex'
+  provider: AgentSessionHandleProvider
   providerSessionId: string
   lease: AgentSessionLease
 }
@@ -30,7 +31,7 @@ export type CommittedStructuredAgentSessionAdoptionReplay = {
 
 /** Exact committed-operation identity; attach still validates its fingerprint. */
 export function findCommittedStructuredAgentSessionAdoptionReplay(input: {
-  agent: 'claude' | 'codex'
+  agent: AgentSessionHandleProvider
   providerSessionId: string
   selfSessionId: string
   callerKey: string
@@ -62,6 +63,11 @@ export function findCommittedStructuredAgentSessionAdoptionReplay(input: {
   if (providerSessionId !== input.providerSessionId) {
     return null
   }
+  // ZCode's journal identity is the opaque handle the adapter mints, which a replay cannot
+  // reconstruct from the durable record; its adoption replays through the adapter instead.
+  if (adopted.handle.provider === 'zcode') {
+    return null
+  }
   return {
     record,
     providerHandle:
@@ -86,7 +92,7 @@ export function findCommittedStructuredAgentSessionAdoptionReplay(input: {
  * ownership index — without this exemption the replay refuses instead of replaying.
  */
 export function findConflictingStructuredAdoption(input: {
-  agent: 'claude' | 'codex'
+  agent: AgentSessionHandleProvider
   providerSessionId: string
   selfSessionId: string
   ownership: readonly StructuredAgentSessionAdoptionOwnership[]
@@ -125,11 +131,11 @@ export function structuredAdoptionConflictError(
  * (selected account before the system default).
  */
 export async function resolveStructuredAgentSessionAdoption(input: {
-  agent: 'claude' | 'codex'
+  agent: AgentSessionHandleProvider
   providerSessionId: string
   candidateAccountHomes: readonly string[]
   resolveTranscript: (args: {
-    agent: 'claude' | 'codex'
+    agent: AgentSessionHandleProvider
     providerSessionId: string
     accountHomePath: string
   }) => Promise<string | null>

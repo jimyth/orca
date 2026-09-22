@@ -9,6 +9,7 @@ import {
   agentSessionFingerprintConflict,
   computeAgentSessionPayloadFingerprint
 } from '../../../../shared/agent-session-mutation-envelope'
+import { isAgentSessionHandleProvider } from '../../../../shared/agent-session-provider-handle'
 import type { z } from 'zod'
 import {
   projectBackgroundTaskEvent,
@@ -76,12 +77,17 @@ async function resolveClientSuppliedAttach(params: z.infer<typeof AttachParams>,
   if (!host.supportsCreate(params.location, params.agent)) {
     throw new Error('structured_agent_session_unsupported')
   }
+  // The wire schema types `agent` as a free identifier; an attach outside the provider union has
+  // no adapter to route to, so it fails closed here instead of as-casting a lie.
+  if (!isAgentSessionHandleProvider(params.agent)) {
+    throw new Error('structured_agent_session_unsupported')
+  }
   const { agent: _attachAgent, provider: _attachProvider, ...attachWithoutAgent } = params
-  const attachParams = {
+  const attachParams: AgentSessionAttachParams = {
     ...attachWithoutAgent,
-    provider: params.provider as 'claude' | 'codex',
-    agent: params.agent as 'claude' | 'codex'
-  } as AgentSessionAttachParams
+    provider: params.provider,
+    agent: params.agent
+  }
   return { host, attachParams }
 }
 
@@ -170,7 +176,7 @@ export const STRUCTURED_AGENT_SESSION_METHODS = [
             },
             envelope: params.envelope,
             worktree: params.worktree,
-            agent: params.agent as 'claude' | 'codex',
+            agent: params.agent,
             caller: callerFor(ctx),
             ...(params.resumeFrom ? { resumeFrom: params.resumeFrom } : {})
           })

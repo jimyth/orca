@@ -1,4 +1,7 @@
-import type { AgentSessionProviderHandleLink } from '../../../shared/agent-session-provider-handle'
+import type {
+  AgentSessionHandleProvider,
+  AgentSessionProviderHandleLink
+} from '../../../shared/agent-session-provider-handle'
 import type {
   AgentSessionProcessIdentity,
   AgentSessionRecord
@@ -54,7 +57,7 @@ export type StructuredAgentSessionHandoffTransport = {
   revealNativeSession?(input: {
     workspaceId: string
     sessionId: string
-    agent?: 'claude' | 'codex'
+    agent?: AgentSessionHandleProvider
     adoptedTerminal?: true
   }): Promise<void> | void
   waitForTuiExit(owner: StructuredTuiOwner): Promise<{ transcriptPath?: string }>

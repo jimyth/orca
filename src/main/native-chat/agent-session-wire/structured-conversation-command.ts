@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { isDefinitiveAgentSessionCreateRefusal } from '../../../shared/agent-session-definitive-refusal'
+import type { AgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
 import { parseAgentSessionOperationTimestamp } from '../../../shared/agent-session-host-authority'
 import type {
   AgentSessionConversationCommand,
@@ -28,7 +29,7 @@ export type ConversationReplacement = {
   sourceSessionId: string
   sessionId: string
   workspaceId: string
-  agent: 'claude' | 'codex'
+  agent: AgentSessionHandleProvider
 }
 
 export function runStructuredConversationCommand(
