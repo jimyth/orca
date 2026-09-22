@@ -65,9 +65,9 @@ export type AgentLaunchSurfaceFactory = {
     worktreeId: string
     agent: 'claude' | 'codex'
     options?: Readonly<Record<string, unknown>>
-    /** `background` means the caller presents this chat, so the host publishes its tab without
-     *  activating it. The route is the host's decision, so the field has to mean the same thing on
-     *  both branches or a caller that asked for `background` loses focus to a tab it did not pick. */
+    /** `background` means the caller presents this chat: the tab is still published and only its
+     *  activation is skipped. Deliberately asymmetric with the terminal branch, which publishes no
+     *  tab at all — a chat has no `paneKey` for the caller to draw from, so it must exist here. */
     presentation?: AgentLaunchPresentation
   }): Promise<AgentLaunchStructuredSurface>
   createTerminalAgent(args: {

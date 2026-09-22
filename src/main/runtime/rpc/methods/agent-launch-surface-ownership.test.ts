@@ -156,10 +156,12 @@ describe('a launch that creates its workspace', () => {
 })
 
 describe('a launch the host routes to a chat instead', () => {
-  // Which route a launch takes is the host's decision and the caller cannot predict it. So the
-  // opt-out has to mean the same thing on both: a caller that said it presents the surface must
-  // not have a chat tab pulled in front of it either.
-  it('publishes the chat without activating it when the caller presents its own surface', async () => {
+  // Which route a launch takes is the host's decision and the caller cannot predict it. The opt-out
+  // lands differently here — the chat tab is published either way and only its activation is
+  // skipped — but a caller that said it presents the surface must not have one pulled in front of
+  // it either. The factory is mocked below, so these two pin what the launch ASKS for, not what
+  // `structured-agent-session-create` then does with it; that publish is pinned in its own tests.
+  it('hands the structured create `activate: false` when the caller presents its own surface', async () => {
     const runtime = runtimeStub()
 
     const result = await launch({ ...EXISTING_LAUNCH, presentation: 'background' }, runtime)
@@ -168,7 +170,7 @@ describe('a launch the host routes to a chat instead', () => {
     expect(createStructuredSession.mock.calls[0]?.[0]).toMatchObject({ activate: false })
   })
 
-  it('still takes the surface when the caller asked for nothing', async () => {
+  it('hands the structured create `activate: true` when the caller asked for nothing', async () => {
     const runtime = runtimeStub()
 
     await launch(EXISTING_LAUNCH, runtime)

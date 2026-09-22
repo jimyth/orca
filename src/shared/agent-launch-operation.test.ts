@@ -9,6 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import type { AgentLaunchPresentation } from './agent-launch-intent'
 import {
   computeAgentLaunchFingerprint,
   type AgentLaunchFingerprintInput
@@ -29,7 +30,7 @@ const BASE = {
 function fingerprintOfWirePayload(
   params: AgentLaunchFingerprintInput & {
     launchSource?: string
-    presentation?: 'background' | 'focused'
+    presentation?: AgentLaunchPresentation
   }
 ): string {
   return computeAgentLaunchFingerprint(params)
@@ -72,15 +73,9 @@ describe('fields the launch fingerprint deliberately ignores', () => {
     )
   })
 
-  it('does not separate two launches that differ only in who presents the surface', () => {
-    // The agent that ends up running is identical; only which side reveals its tab differs.
-    expect(fingerprintOfWirePayload({ ...BASE, presentation: 'background' })).toBe(
-      fingerprintOfWirePayload({ ...BASE, presentation: 'focused' })
-    )
-  })
-
   it('ignores presentation entirely, so a surface-owning caller replays rather than conflicts', () => {
-    // A replay hands back the recorded result without building any surface, so there is no second
+    // The agent that ends up running is identical; only which side reveals its tab differs. A
+    // replay hands back the recorded result without building any surface, so there is no second
     // reveal for this field to have governed — folding it in would refuse an honest retry.
     expect(fingerprintOfWirePayload({ ...BASE, presentation: 'background' })).toBe(
       computeAgentLaunchFingerprint(BASE)

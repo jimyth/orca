@@ -84,9 +84,10 @@ export const AgentLaunch = z.object({
   /**
    * Who presents the surface this launch creates — never where it goes. `background` means the
    * caller draws it from the `paneKey` the outcome reports, so a terminal is created without a
-   * reveal and a structured chat is published without activation. The structured tab itself is
-   * always published; `outcome.kind` names which surface the caller got. Absent keeps today's
-   * reveal, which every shipped caller relies on.
+   * reveal and a structured chat is published without activation — the structured tab itself is
+   * always published. Absent keeps today's reveal, which every shipped caller relies on. Scope is
+   * this launch's own surface: workspace activation and the workspace's setup/default tabs stay
+   * with `create.activate` / `create.navigation`.
    *
    * One arm because that is all this method can honour: `focused` routes the create through
    * orca-runtime-create-terminal.ts:18-25 to the renderer-backed path, which reports no `paneKey`
