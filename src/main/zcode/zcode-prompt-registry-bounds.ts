@@ -86,9 +86,18 @@ export function readZcodePermissionInput(params: unknown): string | null {
   }
   // Re-encode oversized input so the UI still sees a prefix of what was asked.
   const suffixBytes = Buffer.byteLength(ZCODE_PROMPT_INPUT_TRUNCATED_SUFFIX, 'utf8')
-  const head = Buffer.from(serialized, 'utf8')
+  let head = Buffer.from(serialized, 'utf8')
     .subarray(0, ZCODE_PROMPT_MAX_INPUT_BYTES - suffixBytes)
     .toString('utf8')
+  // A byte cut can split a multi-byte sequence, and the replacement characters
+  // the decode produces are wider than the bytes they replace — trim by decoded
+  // characters until the result actually fits the budget.
+  while (
+    head.length > 0 &&
+    Buffer.byteLength(head, 'utf8') + suffixBytes > ZCODE_PROMPT_MAX_INPUT_BYTES
+  ) {
+    head = head.slice(0, -1)
+  }
   return `${head}${ZCODE_PROMPT_INPUT_TRUNCATED_SUFFIX}`
 }
 

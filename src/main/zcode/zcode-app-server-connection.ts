@@ -322,6 +322,7 @@ export async function openZcodeAppServerConnection(
     },
     request,
     respond: (id, result) => writeResponse({ id, result }),
+    respondWithError: (id, code, message) => writeResponse({ id, error: { code, message } }),
     pauseReading: frameReader.pause,
     resumeReading: frameReader.resume,
     close

@@ -26,6 +26,8 @@ export type ZcodeAppServerConnection = {
   ) => Promise<unknown>
   /** Answers a server-initiated request; not gated on storage readiness. */
   respond: (id: number | string, result: unknown) => void
+  /** Rejects a server-initiated request the host will not or cannot answer. */
+  respondWithError: (id: number | string, code: number, message: string) => void
   /** Stops server stdout at a frame boundary while a durable sink drains. */
   pauseReading: () => void
   /** Continues with any frames retained from the chunk that triggered the pause. */

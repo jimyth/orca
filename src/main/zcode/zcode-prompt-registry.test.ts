@@ -383,6 +383,26 @@ describe('ZcodePromptRegistry', () => {
     expect(prompt.input.startsWith('{"command":"xxxx')).toBe(true)
   })
 
+  it('keeps a multi-byte byte-cut within the input byte cap', () => {
+    const registry = new ZcodePromptRegistry()
+    // 2-byte characters: the byte cut splits one, and the replacement
+    // characters the decode produces are wider than the bytes they replace,
+    // so the truncated head needs a second trim by decoded characters.
+    const prompt = registerPermission(registry, 1, {
+      requestId: 'req-1',
+      input: 'é'.repeat(Math.ceil(ZCODE_PROMPT_MAX_INPUT_BYTES / 2) + 64)
+    })
+
+    if (prompt.input === null) {
+      throw new Error('Fixture prompt retained no input')
+    }
+    expect(Buffer.byteLength(prompt.input, 'utf8')).toBeLessThanOrEqual(
+      ZCODE_PROMPT_MAX_INPUT_BYTES
+    )
+    expect(prompt.input.endsWith('…[truncated]')).toBe(true)
+    expect(prompt.input.startsWith('"éé')).toBe(true)
+  })
+
   it('falls back to a placeholder for unserializable input', () => {
     const registry = new ZcodePromptRegistry()
     const circular: Record<string, unknown> = { name: 'loop' }
