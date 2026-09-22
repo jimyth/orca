@@ -83,26 +83,18 @@ export const AgentLaunch = z.object({
   launchSource: z.string().optional(),
   /**
    * Who presents the surface this launch creates — never where it goes. `background` means the
-   * caller draws the tab itself from the `paneKey` the outcome reports, so the host skips its
-   * reveal. Absent is NOT `background`: it keeps the reveal every shipped caller relies on.
+   * caller draws it from the `paneKey` the outcome reports, so a terminal is created without a
+   * reveal and a structured chat is published without activation. The structured tab itself is
+   * always published; `outcome.kind` names which surface the caller got. Absent keeps today's
+   * reveal, which every shipped caller relies on.
    *
-   * One arm, deliberately narrower than the `background | focused` its siblings take. On this
-   * method `focused` flips the routing at orca-runtime-create-terminal.ts:18-25 onto the
-   * renderer-backed create, which reports no `paneKey` — the field this feature is built on — and
-   * forwards no `telemetry`, so `agent_started` never fires. A literal rather than a one-member
-   * enum so widening cannot be a one-word append.
+   * One arm because that is all this method can honour: `focused` routes the create through
+   * orca-runtime-create-terminal.ts:18-25 to the renderer-backed path, which reports no `paneKey`
+   * and no launch telemetry. Widening reintroduces both, and this schema is the only guard —
+   * unlike its siblings there is no authority clamp behind it. Fix that routing first.
    *
-   * WIDENING THIS ARM SET REINTRODUCES BOTH DEFECTS, and this schema is the only guard: unlike
-   * `terminal.create` and `agentSession.create` there is no authority clamp behind it, so a second
-   * arm is immediately reachable by a remote caller. Fix that routing first.
-   *
-   * A caller must read `AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY` before relying on the
-   * opt-out: an older host strips this key and reveals anyway, which is the second tab it exists
-   * to prevent.
-   *
-   * Placement stays off this wire: no group, anchor, order, focus target or navigation. Terminal
-   * surfaces only — a structured launch's tab is published by the host, and the caller learns
-   * which surface it got from `outcome.kind`.
+   * A caller must check `AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY` before relying on
+   * this: an older host strips the key, reveals anyway, and its reply looks like success.
    */
   presentation: z.literal('background').optional()
 })
