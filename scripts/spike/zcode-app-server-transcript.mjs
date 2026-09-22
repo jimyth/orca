@@ -12,7 +12,7 @@ const ZCODE_BIN = process.env.ZCODE_BIN ?? 'zcode'
 const outPath = process.argv[2] ?? 'transcript.ndjson'
 await mkdir(dirname(outPath), { recursive: true })
 const out = createWriteStream(outPath)
-const log = (direction, frame) => out.write(JSON.stringify({ direction, ...frame }) + '\n')
+const log = (direction, frame) => out.write(`${JSON.stringify({ direction, ...frame })}\n`)
 
 const child = spawn(ZCODE_BIN, ['app-server', '--stdio'], { stdio: ['pipe', 'pipe', 'pipe'] })
 let nextId = 1
@@ -22,7 +22,7 @@ let stdoutBuffer = ''
 
 const send = (frame) => {
   log('out', frame)
-  child.stdin.write(JSON.stringify(frame) + '\n')
+  child.stdin.write(`${JSON.stringify(frame)}\n`)
 }
 const request = (method, params) =>
   new Promise((resolve, reject) => {
@@ -37,13 +37,16 @@ const waitFor = (predicate, label, timeoutMs) =>
     waiters.push(waiter)
     setTimeout(() => {
       const i = waiters.indexOf(waiter)
-      if (i < 0) return
+      if (i === -1) {
+        return
+      }
       waiters.splice(i, 1)
       reject(new Error(`timeout waiting for ${label}`))
     }, timeoutMs)
   })
 const dispatch = (frame) => {
-  for (const w of [...waiters]) {
+  // snapshot: resolving splices waiters mid-iteration
+  for (const w of waiters.slice()) {
     if (w.predicate(frame)) {
       waiters.splice(waiters.indexOf(w), 1)
       w.resolve(frame)
@@ -57,7 +60,9 @@ child.stdout.on('data', (chunk) => {
   while ((i = stdoutBuffer.indexOf('\n')) >= 0) {
     const line = stdoutBuffer.slice(0, i).replace(/\r$/, '')
     stdoutBuffer = stdoutBuffer.slice(i + 1)
-    if (!line.trim()) continue
+    if (!line.trim()) {
+      continue
+    }
     let frame
     try {
       frame = JSON.parse(line)
@@ -81,7 +86,9 @@ function handleFrame(frame) {
   if ('error' in frame && pending.has(frame.id)) {
     pending
       .get(frame.id)
-      .reject(new Error(`request ${pending.get(frame.id).method} failed: ${JSON.stringify(frame.error)}`))
+      .reject(
+        new Error(`request ${pending.get(frame.id).method} failed: ${JSON.stringify(frame.error)}`)
+      )
     dispatch(frame)
     return
   }
@@ -94,8 +101,8 @@ function handleFrame(frame) {
         nativeSearchEnhancementsEnabled: false,
         memoryEnabled: false,
         askUserQuestionAutoResolutionEnabled: true,
-        modelContextBudgetStrategy: 'preflight-v1',
-      },
+        modelContextBudgetStrategy: 'preflight-v1'
+      }
     })
   }
   if (frame.method === 'interaction/requestPermission') {
@@ -110,17 +117,19 @@ const main = async () => {
   const storage = await waitFor(
     (f) => f.method === 'startup/storageState' && f.params?.phase === 'ready',
     'storageState phase=ready',
-    60_000,
+    60_000
   )
   console.error(`storageState ready: ${JSON.stringify(storage.params).slice(0, 300)}`)
 
   // 2. create a session in a scratch workspace
   const created = await request('session/create', {
-    workspace: { workspacePath: '/tmp/zcode-spike-ws', workspaceKey: 'spike' },
+    workspace: { workspacePath: '/tmp/zcode-spike-ws', workspaceKey: 'spike' }
   })
   console.error(`session/create result: ${JSON.stringify(created).slice(0, 400)}`)
   const sessionId = created?.session?.sessionId ?? created?.sessionId
-  if (!sessionId) throw new Error('no sessionId in session/create result: ' + JSON.stringify(created))
+  if (!sessionId) {
+    throw new Error(`no sessionId in session/create result: ${JSON.stringify(created)}`)
+  }
 
   // 3. subscribe BEFORE sending so no event is missed
   await request('session/subscribe', { sessionId, deliveryKind: 'desktop-continuous' })
@@ -134,15 +143,15 @@ const main = async () => {
       providerId: process.env.ZCODE_PROVIDER_ID ?? 'bigmodel-api',
       modelId: process.env.ZCODE_MODEL_ID ?? 'GLM-5.3',
       // reasoningLevel is mandatory when the model declares reasoning variants
-      options: { reasoningLevel: process.env.ZCODE_REASONING_LEVEL ?? 'max' },
-    },
+      options: { reasoningLevel: process.env.ZCODE_REASONING_LEVEL ?? 'max' }
+    }
   })
 
   // 5. let the turn run to completion (permission requests are auto-allowed in handleFrame)
   await waitFor(
     (f) => f.method === 'session/event' && f.params?.type === 'turn.completed',
     'turn.completed',
-    180_000,
+    180_000
   ).catch((e) => console.error(`[spike] ${e.message}; continuing`))
 
   // 6. resume probe
