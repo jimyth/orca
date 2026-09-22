@@ -27,6 +27,9 @@ describe('agent.launch params', () => {
     // `worktree.create` caller can ask for. Asserted at the schema, which is what enforces it.
     const create = { repo: 'id:repo-1', name: 'task', presentation: 'background' }
     const parsed = AgentLaunch.parse({ ...BASE, target: { kind: 'create-worktree', create } })
+    if (parsed.target.kind !== 'create-worktree') {
+      throw new Error('expected a create-worktree target')
+    }
     expect(parsed.target.create).not.toHaveProperty('presentation')
     expect(parsed.target.create).not.toHaveProperty('startupPresentation')
   })
