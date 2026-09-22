@@ -22,6 +22,15 @@ describe('agent.launch params', () => {
     expect(AgentLaunch.parse(BASE)).not.toHaveProperty('agentArgs')
   })
 
+  it('strips a presentation smuggled into the create payload', () => {
+    // The opt-out is a sibling of `create`, never a field inside it: it must not become something a
+    // `worktree.create` caller can ask for. Asserted at the schema, which is what enforces it.
+    const create = { repo: 'id:repo-1', name: 'task', presentation: 'background' }
+    const parsed = AgentLaunch.parse({ ...BASE, target: { kind: 'create-worktree', create } })
+    expect(parsed.target.create).not.toHaveProperty('presentation')
+    expect(parsed.target.create).not.toHaveProperty('startupPresentation')
+  })
+
   it('accepts a cwd and rejects an empty one', () => {
     expect(AgentLaunch.parse({ ...BASE, cwd: '/repo/packages/api' }).cwd).toBe('/repo/packages/api')
     expect(AgentLaunch.safeParse({ ...BASE, cwd: '' }).success).toBe(false)

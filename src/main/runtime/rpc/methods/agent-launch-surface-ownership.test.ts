@@ -143,9 +143,9 @@ describe('a launch that creates its workspace', () => {
     )
   })
 
-  it('keeps the opt-out out of the worktree-create payload itself', async () => {
-    // A sibling of `create`, never a field inside it: suppressing this launch's reveal must not
-    // become something a `worktree.create` caller can ask for.
+  it('names the sibling startupPresentation, not a bare presentation, on the runtime args', async () => {
+    // Only the NAME of the create-args field; that the wire cannot smuggle one into `create` is
+    // pinned at the schema itself, in agent-launch-params.test.ts.
     const runtime = runtimeStub({ settings: TERMINAL_ONLY })
 
     await launch({ ...CREATE_LAUNCH, presentation: 'background' }, runtime)
