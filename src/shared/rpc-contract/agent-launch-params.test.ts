@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY,
+  AGENT_LAUNCH_PRESENTATION_RUNTIME_CAPABILITY,
   RUNTIME_CAPABILITIES
 } from '../protocol-version'
 import { AgentLaunch } from './agent-launch-params'
@@ -84,12 +84,10 @@ describe('agent.launch params', () => {
 // before sending the opt-out, or it draws a second tab beside the one the host revealed.
 describe('the opt-out a caller has to negotiate first', () => {
   it('uses the id a caller codes against', () => {
-    expect(AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY).toBe(
-      'agent.launch.surface-ownership.v1'
-    )
+    expect(AGENT_LAUNCH_PRESENTATION_RUNTIME_CAPABILITY).toBe('agent.launch.presentation.v1')
   })
 
   it('is advertised by every host that honours the field', () => {
-    expect(RUNTIME_CAPABILITIES).toContain(AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY)
+    expect(RUNTIME_CAPABILITIES).toContain(AGENT_LAUNCH_PRESENTATION_RUNTIME_CAPABILITY)
   })
 })

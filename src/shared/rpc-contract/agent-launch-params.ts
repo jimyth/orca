@@ -94,7 +94,7 @@ export const AgentLaunch = z.object({
    * and no launch telemetry. Widening reintroduces both, and this schema is the only guard —
    * unlike its siblings there is no authority clamp behind it. Fix that routing first.
    *
-   * A caller must check `AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY` before relying on
+   * A caller must check `AGENT_LAUNCH_PRESENTATION_RUNTIME_CAPABILITY` before relying on
    * this: an older host strips the key, reveals anyway, and its reply looks like success.
    */
   presentation: z.literal('background').optional()

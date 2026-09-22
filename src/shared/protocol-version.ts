@@ -277,8 +277,7 @@ export const AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY =
 // while still reporting the `paneKey` a caller draws its own tab from. That reply is
 // indistinguishable from success, so a caller presenting its own surface gets two tabs unless it
 // refuses the opt-out on a host that does not advertise this.
-export const AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY =
-  'agent.launch.surface-ownership.v1' as const
+export const AGENT_LAUNCH_PRESENTATION_RUNTIME_CAPABILITY = 'agent.launch.presentation.v1' as const
 
 // Generic native clients include the CLI and must not claim Electron-only page
 // placement support.
@@ -397,7 +396,7 @@ export const RUNTIME_CAPABILITIES = [
   AGENT_LAUNCH_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_REPLAY_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY,
-  AGENT_LAUNCH_SURFACE_OWNERSHIP_RUNTIME_CAPABILITY
+  AGENT_LAUNCH_PRESENTATION_RUNTIME_CAPABILITY
 ] as const
 
 export type RuntimeCapability = (typeof RUNTIME_CAPABILITIES)[number] | (string & {})
