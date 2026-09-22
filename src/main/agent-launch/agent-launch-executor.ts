@@ -32,6 +32,7 @@ import type {
   AgentLaunchTarget
 } from '../../shared/agent-launch-intent'
 import { withoutReservedAgentCreateFields } from '../../shared/agent-launch-intent'
+import type { RuntimeTerminalPresentation } from '../../shared/runtime-terminal-contracts'
 import {
   argvLaunchPrompt,
   deliverTerminalLaunchPrompt,
@@ -77,6 +78,9 @@ export type AgentLaunchSurfaceFactory = {
     cwd?: string
     /** The one member of the `agent_started` triple the host cannot derive for itself. */
     launchSource?: string
+    /** `background` when the caller draws this terminal's tab itself, so the runtime creates the
+     *  agent without revealing it. Absent leaves the runtime's own reveal in place. */
+    presentation?: RuntimeTerminalPresentation
     /** `paneKey` names the pane this create minted, for a caller that presents its own tabs; a
      *  factory whose runtime does not report one omits it rather than inventing a key. */
   }): Promise<{ handle: string; paneKey?: string; warning?: string }>
@@ -139,6 +143,7 @@ export type AgentLaunchWorkspaceFactory = {
     agentArgs?: string | null
     cwd?: string
     launchSource?: string
+    presentation?: RuntimeTerminalPresentation
   }): Promise<{
     worktreeId: string
     startupTerminalHandle: string | undefined
@@ -304,7 +309,10 @@ async function resolveWorkspace(
       : {
           ...(intent.agentArgs !== undefined ? { agentArgs: intent.agentArgs } : {}),
           ...(intent.cwd ? { cwd: intent.cwd } : {}),
-          ...(intent.launchSource ? { launchSource: intent.launchSource } : {})
+          ...(intent.launchSource ? { launchSource: intent.launchSource } : {}),
+          // Beside the other startup-terminal inputs on purpose: the startup terminal is the only
+          // surface this create reveals, and a structured create has none to suppress.
+          ...(intent.presentation ? { presentation: intent.presentation } : {})
         })
   })
   // Only when a startup terminal actually came back: a create that produced none ran no command,
@@ -386,7 +394,8 @@ async function createTerminalSurface(
     // `null` is a value the caller meant, so this tests for absence rather than falsiness.
     ...(intent.agentArgs !== undefined ? { agentArgs: intent.agentArgs } : {}),
     ...(intent.cwd ? { cwd: intent.cwd } : {}),
-    ...(intent.launchSource ? { launchSource: intent.launchSource } : {})
+    ...(intent.launchSource ? { launchSource: intent.launchSource } : {}),
+    ...(intent.presentation ? { presentation: intent.presentation } : {})
   })
   return {
     outcome: {

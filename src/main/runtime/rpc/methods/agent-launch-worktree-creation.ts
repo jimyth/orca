@@ -41,7 +41,8 @@ export function agentLaunchWorkspaceFactory(
       startupPrompt,
       agentArgs,
       cwd,
-      launchSource
+      launchSource,
+      presentation
     }) => {
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: already validated by `AgentLaunch`; the executor only removed the reserved agent fields, so the rest of the payload is the parsed shape.
       const params = create as WorktreeCreateParams
@@ -78,6 +79,9 @@ export function agentLaunchWorkspaceFactory(
           ...(agentArgs !== undefined ? { startupAgentArgs: agentArgs } : {}),
           ...(cwd ? { startupCwd: cwd } : {}),
           ...(launchSource ? { startupLaunchSource: launchSource } : {}),
+          // A sibling of the create payload rather than a field inside it: suppressing this
+          // launch's reveal must not become something a `worktree.create` caller can ask for.
+          ...(presentation ? { startupPresentation: presentation } : {}),
           // The launch owns the agent whichever surface it settles on, so the workspace records
           // it even when no startup terminal was created for it.
           createdWithAgent: agent,

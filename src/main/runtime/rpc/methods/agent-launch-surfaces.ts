@@ -96,7 +96,8 @@ export function agentLaunchSurfaceFactory(
       startupPrompt,
       agentArgs,
       cwd,
-      launchSource
+      launchSource,
+      presentation
     }) => {
       const terminal = await context.runtime.createTerminal(`id:${worktreeId}`, {
         // The agent id is not a shell command — `cursor` is the desktop app, its CLI is
@@ -107,6 +108,9 @@ export function agentLaunchSurfaceFactory(
         ...(startupPrompt ? { startupPrompt } : {}),
         ...(agentArgs !== undefined ? { agentArgs } : {}),
         ...(cwd ? { cwd } : {}),
+        // Absent leaves `resolveTerminalPresentation` at `undefined`, which is the reveal this
+        // method has always driven; `background` hands the tab to the caller that asked for it.
+        ...(presentation ? { presentation } : {}),
         ...agentLaunchTelemetry(agent, launchSource)
       })
       return {

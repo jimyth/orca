@@ -15,6 +15,7 @@ import { z } from 'zod'
 import { parseAgentSessionOperationTimestamp } from '../agent-session-host-authority'
 import { isTuiAgent } from '../tui-agent-config'
 import type { TuiAgent } from '../tui-agent'
+import { Presentation } from './agent-session-params'
 import { WorktreeCreate } from './worktree-create-params'
 
 const LaunchAgent = z
@@ -80,7 +81,28 @@ export const AgentLaunch = z.object({
    * action, so the arm set stays open here and the host parses it leniently at the point it is
    * actually used — the same `safeParse`-and-skip the PTY spawn already does.
    */
-  launchSource: z.string().optional()
+  launchSource: z.string().optional(),
+  /**
+   * Who presents the surface this launch creates — never where it goes.
+   *
+   * The same `presentation` vocabulary `terminal.create` and `agentSession.create` already take,
+   * for the same reason: `background` means the caller draws the surface itself, so the host must
+   * not drive a reveal. `launch-agent-in-new-tab` is the case that needs it — it places its own tab
+   * from the `paneKey` the outcome reports, and a host reveal on top of that is a second tab.
+   *
+   * Absent is NOT `background`. Omitting it keeps the host revealing exactly as it does today, so
+   * every shipped caller — mobile, orchestration, the CLI — is unaffected, and an older client that
+   * cannot send the field is indistinguishable from one that chose the default. Only an explicit
+   * `background` suppresses.
+   *
+   * Placement stays off this wire: no group, anchor, order, focus target or navigation. Mobile
+   * speaks this method and has no tabs.
+   *
+   * Terminal surfaces only, because they are the only ones with a pane a caller could place. A
+   * structured launch's tab is published by the host and always has been, and the caller learns
+   * which it got from `outcome.kind` — so this is out of scope there, not silently dropped.
+   */
+  presentation: Presentation.optional()
 })
 
 export type AgentLaunchParams = z.infer<typeof AgentLaunch>

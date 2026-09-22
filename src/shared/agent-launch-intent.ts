@@ -12,6 +12,7 @@
  * receipt rather than requested here.
  */
 
+import type { RuntimeTerminalPresentation } from './runtime-terminal-contracts'
 import type { TuiAgent } from './tui-agent'
 
 /** How a launch's initial text reaches the agent. */
@@ -83,6 +84,18 @@ export type AgentLaunchIntent = {
    * it cannot know.
    */
   launchSource?: string
+  /**
+   * Who presents the terminal surface this launch creates — the caller, or the host as it does
+   * today. `background` means the caller owns it, so the host skips its reveal; absent keeps the
+   * host's, which is what every shipped caller relies on.
+   *
+   * Presentation, never placement: it says who reveals, and nothing about which group, what order,
+   * or what takes focus. That decision never leaves the client that draws tabs.
+   *
+   * Deliberately NOT a route input, and deliberately not part of the launch's fingerprint — the
+   * agent that ends up running is the same either way.
+   */
+  presentation?: RuntimeTerminalPresentation
 }
 
 /** The surface the host actually created. */

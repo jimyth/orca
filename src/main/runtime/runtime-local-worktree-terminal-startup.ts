@@ -107,7 +107,10 @@ export async function startRuntimeLocalWorktreeTerminals(args: {
         ...(sequencedStartup.viewMode ? { viewMode: sequencedStartup.viewMode } : {}),
         startupCommandDelivery: sequencedStartup.startupCommandDelivery,
         telemetry: sequencedStartup.telemetry,
-        ...ownerSurfacing(shouldActivate)
+        ...ownerSurfacing(shouldActivate),
+        // Distinct from `surfaceOwner`, which still reveals and only declines to pull the sidebar
+        // across; this skips the reveal outright for a caller that mints the tab itself.
+        ...(request.startupPresentation ? { presentation: request.startupPresentation } : {})
       })
       if (args.draftPaste) {
         ports.pasteDraft(terminal.handle, args.draftPaste)

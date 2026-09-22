@@ -120,7 +120,8 @@ export async function createRuntimeRemoteManagedWorktree(
         ...(sequencedStartup.viewMode ? { viewMode: sequencedStartup.viewMode } : {}),
         startupCommandDelivery: sequencedStartup.startupCommandDelivery,
         telemetry: sequencedStartup.telemetry,
-        ...ownerSurfacing(shouldActivate)
+        ...ownerSurfacing(shouldActivate),
+        ...(args.startupPresentation ? { presentation: args.startupPresentation } : {})
       })
       if (args.startupDraftPaste) {
         deps.pasteDraft(terminal.handle, args.startupDraftPaste)

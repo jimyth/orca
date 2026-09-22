@@ -48,6 +48,13 @@ export type AgentLaunchFingerprintInput = {
    * its own original. That is the rule the mutable host settings above are excluded under — the
    * digest covers what the call DOES — and the cost of leaving it out is only that a replay reports
    * the first attempt's attribution, which is the truthful answer: one launch happened.
+   *
+   * `presentation` is out for the same reason and one more. The digest covers what the call DOES,
+   * and the agent that ends up running is identical either way — only who reveals its tab differs.
+   * The extra reason is that a replay hands back the recorded result without building any surface,
+   * so there is no second reveal for the field to have governed; folding it in would convert a
+   * client that retried the same launch from a surface-owning caller into a refused conflict over
+   * a decision the replay never re-makes.
    */
 }
 

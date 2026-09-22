@@ -91,7 +91,8 @@ async function agentLaunchIntent(
     // `null` means "no arguments" and must survive; only absence falls back to the settings default.
     ...(params.agentArgs !== undefined ? { agentArgs: params.agentArgs } : {}),
     ...(params.cwd ? { cwd: params.cwd } : {}),
-    ...(params.launchSource ? { launchSource: params.launchSource } : {})
+    ...(params.launchSource ? { launchSource: params.launchSource } : {}),
+    ...(params.presentation ? { presentation: params.presentation } : {})
   }
 }
 

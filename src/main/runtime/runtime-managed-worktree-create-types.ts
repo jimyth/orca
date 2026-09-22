@@ -13,6 +13,7 @@ import type { WorktreeStartupLaunch } from '../../shared/worktree/launch-types'
 import type { TaskSourceContext } from '../../shared/task-source-context'
 import type { WorktreeStartupDraftPaste } from './runtime-worktree-agent-startup'
 import type { RuntimeNavigationTarget } from '../../shared/runtime-navigation'
+import type { RuntimeTerminalPresentation } from '../../shared/runtime-terminal-contracts'
 
 export type RuntimeManagedWorktreeCreateArgs = {
   repoSelector: string
@@ -55,6 +56,9 @@ export type RuntimeManagedWorktreeCreateArgs = {
   startupAgentArgs?: string | null
   startupCwd?: string
   startupLaunchSource?: string
+  /** `background` when the caller draws the startup terminal's tab itself. Absent keeps the
+   *  reveal every existing create path relies on. */
+  startupPresentation?: RuntimeTerminalPresentation
   pendingFirstAgentMessageRename?: boolean
   automationProvenance?: AutomationWorkspaceProvenance
   cliProvenance?: CliWorkspaceProvenance

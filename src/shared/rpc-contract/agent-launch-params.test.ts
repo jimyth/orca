@@ -31,10 +31,28 @@ describe('agent.launch params', () => {
     expect(parsed.data?.launchSource).toBe('a_surface_added_later')
   })
 
+  it('accepts either arm of the presentation vocabulary the sibling methods already take', () => {
+    expect(AgentLaunch.parse({ ...BASE, presentation: 'background' }).presentation).toBe(
+      'background'
+    )
+    expect(AgentLaunch.parse({ ...BASE, presentation: 'focused' }).presentation).toBe('focused')
+  })
+
+  it('leaves presentation absent rather than defaulting it', () => {
+    // Absent is the whole compatibility argument: it must not read as `background`, or every
+    // shipped caller would silently lose the reveal it relies on.
+    expect(AgentLaunch.parse(BASE)).not.toHaveProperty('presentation')
+  })
+
+  it('refuses a presentation that is not one of the two arms', () => {
+    expect(AgentLaunch.safeParse({ ...BASE, presentation: 'hidden' }).success).toBe(false)
+  })
+
   it('still parses a payload from a client that sends none of these fields', () => {
     // Rule 1: the fields are optional, so a shipped client that predates them is unaffected.
     const parsed = AgentLaunch.parse(BASE)
     expect(parsed).not.toHaveProperty('cwd')
     expect(parsed).not.toHaveProperty('launchSource')
+    expect(parsed).not.toHaveProperty('presentation')
   })
 })
