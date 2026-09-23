@@ -15,7 +15,14 @@ import {
   type StructuredAgentSessionAdapter,
   type StructuredAgentSessionSetOptionInput
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
+import { AgentSessionOptionRejectedError } from '../native-chat/agent-session-wire/structured-agent-session-option-error'
 import type { ZcodeAppServerConnection } from './zcode-app-server-connection'
+import type { ZcodeSessionSendParams } from './zcode-protocol'
+import {
+  applyZcodeOptionOverride,
+  applyZcodeOptionOverrides,
+  zcodeSessionModels
+} from './zcode-structured-session-options'
 import { isZcodeAppServerRequestError } from './zcode-app-server-connection'
 import { supportsZcodeStructuredLocation } from './zcode-structured-location-support'
 import {
@@ -154,6 +161,18 @@ export class ZcodeStructuredSessionAdapter implements StructuredAgentSessionAdap
     return true
   }
 
+  /** Resolver → create echo → shipped default, then mid-session overrides on
+   *  top (see applyZcodeOptionOverrides for why they win). */
+  private async resolveModelSelection(
+    session: ZcodeSession | undefined,
+    sessionId: string
+  ): Promise<ZcodeSessionSendParams['modelSelection']> {
+    const base = this.deps.resolveModelSelection
+      ? await this.deps.resolveModelSelection({ sessionId })
+      : (session?.modelSelection ?? defaultZcodeModelSelection())
+    return applyZcodeOptionOverrides(base, session?.optionOverrides)
+  }
+
   async dispatch(input: {
     sessionId: string
     clientMessageId: string
@@ -163,9 +182,7 @@ export class ZcodeStructuredSessionAdapter implements StructuredAgentSessionAdap
     beforeDispatch?: () => Promise<void>
   }): Promise<AgentSessionDispatchOutcome> {
     const session = requireLiveZcodeSession(this.sessions, input.sessionId)
-    const modelSelection = this.deps.resolveModelSelection
-      ? await this.deps.resolveModelSelection({ sessionId: input.sessionId })
-      : (session.modelSelection ?? defaultZcodeModelSelection())
+    const modelSelection = await this.resolveModelSelection(session, input.sessionId)
     await input.beforeDispatch?.()
     // Armed before the write: turn.started can land while the response is in
     // flight, and only the echo names which send opened the turn.
@@ -229,26 +246,32 @@ export class ZcodeStructuredSessionAdapter implements StructuredAgentSessionAdap
     this.sessions.get(sessionId)?.promptItemIds.set(journalItemId, promptKey)
   }
 
-  /** Launch settlement asks every structured session for its options; with no
-   * option catalog yet (follow-up FU3) report the live model selection only,
-   * resolved through the same chain dispatch uses. */
   readOptions: StructuredAgentSessionAdapter['readOptions'] = async (input) => {
     const session = this.sessions.get(input.sessionId)
-    const selection = this.deps.resolveModelSelection
-      ? await this.deps.resolveModelSelection({ sessionId: input.sessionId })
-      : (session?.modelSelection ?? defaultZcodeModelSelection())
+    const selection = await this.resolveModelSelection(session, input.sessionId)
     return {
-      models: [],
-      current: { model: `${selection.providerId}/${selection.modelId}` }
+      models: zcodeSessionModels(session),
+      current: {
+        model: `${selection.providerId}/${selection.modelId}`,
+        effort: selection.options.reasoningLevel
+      }
     }
   }
 
   async setOption(
     input: StructuredAgentSessionSetOptionInput
   ): Promise<void | Readonly<Record<string, string>>> {
-    // Model selection rides session/send and permission posture is owned by the
-    // launch policy, so there is no live session option to set yet.
-    throw new Error(`zcode app-server has no session option named ${input.key}`)
+    const session = requireLiveZcodeSession(this.sessions, input.sessionId)
+    if (input.key !== 'model' && input.key !== 'effort') {
+      // Everything else is owned by session/send or the launch policy.
+      throw new Error(`zcode app-server has no session option named ${input.key}`)
+    }
+    try {
+      applyZcodeOptionOverride(session, input.key, input.value)
+    } catch (error) {
+      throw new AgentSessionOptionRejectedError(error)
+    }
+    return { [input.key]: input.value }
   }
 
   closeSession = (sessionId: string): Promise<boolean> => this.stop(sessionId)

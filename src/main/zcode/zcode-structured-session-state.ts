@@ -12,6 +12,7 @@ import type {
   AgentJournalItemIdentity,
   AgentSessionJournalIdentity
 } from '../../shared/agent-session-journal-types'
+import type { CatalogModel } from '../../shared/agent-session-option-catalog-types'
 import type { StructuredAgentSessionLifecycleEvent } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import type { StructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
 import type {
@@ -88,6 +89,12 @@ export type ZcodeSession = {
   providerSessionId: string
   /** Model selection the create result echoed, when it carried one. */
   modelSelection: ZcodeSessionSendParams['modelSelection'] | null
+  /** Models the create result's settings.model.available offered (ids are
+   *  `${providerId}/${modelId}`); empty when the result carried no settings. */
+  availableModels: CatalogModel[]
+  /** The user's explicit mid-session picks ('model' = compound id, 'effort' =
+   *  reasoning level), outranking every resolver on later sends. */
+  optionOverrides: Map<string, string>
   /** Registry carried over from the acquisition window once the session publishes. */
   prompts: ZcodeAcquisitionWindow['prompts']
   /** requestIds already answered on the wire; a re-sent frame must not re-prompt. */

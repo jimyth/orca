@@ -247,18 +247,6 @@ describe('ZcodeStructuredSessionAdapter.acquire', () => {
   })
 })
 
-describe('ZcodeStructuredSessionAdapter.readOptions', () => {
-  it('reports the live model selection with no option catalog yet', async () => {
-    const zcode = fakeZcode()
-    const adapter = await acquired(zcode, [], MODEL_SELECTION)
-
-    const options = await adapter.readOptions?.({ sessionId: 'session-1', fence: 7 })
-
-    expect(options?.models).toEqual([])
-    expect(options?.current.model).toBe(`${MODEL_SELECTION.providerId}/${MODEL_SELECTION.modelId}`)
-  })
-})
-
 describe('ZcodeStructuredSessionAdapter.dispatch', () => {
   it('sends session/send with the message text and the resolved model selection', async () => {
     const zcode = fakeZcode()

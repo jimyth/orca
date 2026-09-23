@@ -14,6 +14,10 @@ import type { AgentSessionProcessIdentity } from '../../shared/agent-session-rec
 import { readProcessStartTimeMs } from '../runtime/agent-session-process-identity-probe'
 import { openZcodeAppServerConnection } from './zcode-app-server-connection'
 import {
+  readZcodeAvailableModels,
+  restoredZcodeOptionOverrides
+} from './zcode-structured-model-catalog'
+import {
   disposeZcodeServerRequest,
   zcodeRuntimePreferencesResponse
 } from './zcode-server-request-disposition'
@@ -264,6 +268,8 @@ export async function acquireZcodeStructuredSession(input: {
       acquisitionGeneration,
       providerSessionId,
       modelSelection: readZcodeModelSelectionEcho(createResult),
+      availableModels: readZcodeAvailableModels(createResult),
+      optionOverrides: restoredZcodeOptionOverrides(acquireInput.options),
       prompts: acquisition.prompts,
       answeredRequests: new Set(),
       promptItemIds: new Map(),
