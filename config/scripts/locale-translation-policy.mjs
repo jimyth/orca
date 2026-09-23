@@ -71,6 +71,7 @@ export const NEVER_TRANSLATE_VALUES = new Set([
   'Markdown',
   'VS Code',
   'Warp',
+  'ZCode',
   'Zed',
   'android',
   'codex',
