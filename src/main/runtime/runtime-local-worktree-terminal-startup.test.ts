@@ -85,6 +85,38 @@ describe('startRuntimeLocalWorktreeTerminals startup presentation', () => {
 
     expect(options).not.toHaveProperty('presentation')
   })
+
+  it.each([
+    ['background', null],
+    [undefined, 'term-1']
+  ] as const)(
+    'with startupPresentation %s, offers %s to setup as its split target',
+    async (startupPresentation, expectedPrimary) => {
+      for (const activate of [true, false]) {
+        const { ports } = createPorts()
+        await startRuntimeLocalWorktreeTerminals({
+          request: {
+            repoSelector: `id:${repo.id}`,
+            name: worktree.displayName,
+            activate,
+            ...(startupPresentation ? { startupPresentation } : {})
+          },
+          repo,
+          worktree,
+          setup: { runnerScriptPath: '/worktree/.orca/setup.sh', envVars: {} },
+          createdWithAgent: 'codex',
+          startup: { command: 'codex' },
+          ports
+        })
+        expect(ports.provision).toHaveBeenCalledWith(
+          expect.objectContaining({
+            primaryTerminalHandle: expectedPrimary,
+            hasStartupTerminal: true
+          })
+        )
+      }
+    }
+  )
 })
 
 describe('startRuntimeLocalWorktreeTerminals default shell seeding', () => {

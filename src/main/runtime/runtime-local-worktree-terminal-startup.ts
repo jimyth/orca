@@ -108,8 +108,7 @@ export async function startRuntimeLocalWorktreeTerminals(args: {
         startupCommandDelivery: sequencedStartup.startupCommandDelivery,
         telemetry: sequencedStartup.telemetry,
         ...ownerSurfacing(shouldActivate),
-        // Distinct from `surfaceOwner`, which still reveals and only declines to pull the sidebar
-        // across; this skips the reveal outright for a caller that mints the tab itself.
+        // Unlike `surfaceOwner: false`, which still reveals, this skips the reveal outright.
         ...(request.startupPresentation ? { presentation: request.startupPresentation } : {})
       })
       if (args.draftPaste) {
@@ -207,7 +206,9 @@ function provisionArgs(
     worktreePath: args.worktree.path,
     ...(args.setup ? { setup: args.setup } : {}),
     ...(args.defaultTabs ? { defaultTabs: args.defaultTabs } : {}),
-    primaryTerminalHandle,
+    // A caller-presented startup pane has no tab yet, so a setup split into it would fail.
+    primaryTerminalHandle:
+      args.request.startupPresentation === 'background' ? null : primaryTerminalHandle,
     hasStartupTerminal,
     setupCommandPlatform: setupPlatform(args.setup, 'posix'),
     observeSetupCompletion: args.request.observeSetupCompletion,

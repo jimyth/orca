@@ -142,6 +142,9 @@ export async function createRuntimeRemoteManagedWorktree(
     }
   }
 
+  // A caller-presented startup pane has no tab yet, so a setup split into it would fail.
+  const setupSplitTargetHandle =
+    args.startupPresentation === 'background' ? null : startupTerminalHandle
   if (shouldActivate) {
     const runtimeWillProvisionTerminals =
       didSpawnStartup && Boolean(result.setup || result.defaultTabs)
@@ -155,7 +158,7 @@ export async function createRuntimeRemoteManagedWorktree(
         worktreePath: result.worktree.path,
         ...(result.setup ? { setup: result.setup } : {}),
         ...(result.defaultTabs ? { defaultTabs: result.defaultTabs } : {}),
-        primaryTerminalHandle: startupTerminalHandle,
+        primaryTerminalHandle: setupSplitTargetHandle,
         hasStartupTerminal: didSpawnStartup,
         setupCommandPlatform: setupPlatform(result.setup),
         observeSetupCompletion: args.observeSetupCompletion,
@@ -205,7 +208,7 @@ export async function createRuntimeRemoteManagedWorktree(
       worktreePath: result.worktree.path,
       ...(result.setup ? { setup: result.setup } : {}),
       ...(result.defaultTabs ? { defaultTabs: result.defaultTabs } : {}),
-      primaryTerminalHandle: startupTerminalHandle,
+      primaryTerminalHandle: setupSplitTargetHandle,
       hasStartupTerminal: didSpawnStartup,
       setupCommandPlatform: setupPlatform(result.setup),
       observeSetupCompletion: args.observeSetupCompletion,

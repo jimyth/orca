@@ -1,15 +1,16 @@
-/**
- * The startup terminal an SSH-remote create spawns.
- *
- * A third copy of the `startupPresentation` forward, on the path a paired client is most likely to
- * be drawing its own tabs from. Nothing above these three catches the one that stops carrying it.
- */
+/** The startup terminal an SSH-remote create spawns; each create path forwards presentation itself. */
 
 import { describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../shared/repo-types'
+import type { WorktreeSetupLaunch } from '../../shared/worktree/launch-types'
 
 const requestRuntimeRemoteWorktree = vi.hoisted(() =>
-  vi.fn(async () => ({ worktree: { id: 'wt-remote', path: '/remote/wt' } }))
+  vi.fn(
+    async (): Promise<{
+      worktree: { id: string; path: string }
+      setup?: WorktreeSetupLaunch
+    }> => ({ worktree: { id: 'wt-remote', path: '/remote/wt' } })
+  )
 )
 
 vi.mock('./runtime-remote-worktree-create-request', () => ({ requestRuntimeRemoteWorktree }))
@@ -76,4 +77,37 @@ describe('a remote managed create with a startup agent', () => {
   it('leaves the reveal in place when no presentation was asked for', async () => {
     expect(await startupTerminalOptions()).not.toHaveProperty('presentation')
   })
+
+  it.each([
+    ['background', null],
+    [undefined, 'term-1']
+  ] as const)(
+    'with startupPresentation %s, offers %s to setup as its split target',
+    async (startupPresentation, expectedPrimary) => {
+      for (const activate of [true, false]) {
+        requestRuntimeRemoteWorktree.mockResolvedValueOnce({
+          worktree: { id: 'wt-remote', path: '/remote/wt' },
+          setup: { runnerScriptPath: '/remote/wt/.orca/setup.sh', envVars: {} }
+        })
+        const { deps } = createDeps()
+        await createRuntimeRemoteManagedWorktree(
+          repo,
+          {
+            name: 'task',
+            activate,
+            createdWithAgent: 'codex',
+            startup: { command: 'codex' },
+            ...(startupPresentation ? { startupPresentation } : {})
+          },
+          deps
+        )
+        expect(deps.provision).toHaveBeenCalledWith(
+          expect.objectContaining({
+            primaryTerminalHandle: expectedPrimary,
+            hasStartupTerminal: true
+          })
+        )
+      }
+    }
+  )
 })
