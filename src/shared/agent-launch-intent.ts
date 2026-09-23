@@ -120,7 +120,8 @@ export type AgentLaunchOutcome =
       /**
        * Whether the host revealed this pane. `background` covers a caller's opt-out, a host with no
        * window and a failed reveal alike, so draw a tab from `paneKey` only on `background`; absent
-       * (a reused terminal, or an older host) means the host owns the tab.
+       * (a reused terminal, or an older host) means the host owns the tab. A timed-out reveal can
+       * still land after this answer, so adopt a tab already holding the pane rather than add one.
        */
       surface?: AgentLaunchTerminalSurface
     }
@@ -263,10 +264,9 @@ function isAgentLaunchOutcome(value: unknown): value is AgentLaunchOutcome {
     ? // Checked when present, ignored when absent: a row written before this field existed, or by a
       // runtime that minted no pane, still reads. Deliberately not parsed — a read-side shape rule
       // stricter than the write side turns one odd row into a refused replay.
+      // `surface` too: a value a newer build adds still reads, since callers act only on `background`.
       (outcome.paneKey === undefined || typeof outcome.paneKey === 'string') &&
-        (outcome.surface === undefined ||
-          outcome.surface === 'visible' ||
-          outcome.surface === 'background')
+        (outcome.surface === undefined || typeof outcome.surface === 'string')
     : outcome.kind === 'structured' &&
         typeof outcome.sessionId === 'string' &&
         outcome.sessionId.length > 0

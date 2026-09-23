@@ -174,9 +174,16 @@ describe('reading a recorded launch back', () => {
     ).toBe(true)
   })
 
-  it('refuses a row whose surface is outside the vocabulary', () => {
+  // A downgraded host must still replay a row a newer build wrote with a surface it cannot name.
+  it('accepts a row whose surface a newer build named', () => {
     expect(
       isAgentLaunchResult({ ...BASE, outcome: { kind: 'terminal', handle: 't', surface: 'shown' } })
+    ).toBe(true)
+  })
+
+  it('refuses a row whose surface is not a string', () => {
+    expect(
+      isAgentLaunchResult({ ...BASE, outcome: { kind: 'terminal', handle: 't', surface: 1 } })
     ).toBe(false)
   })
 
