@@ -66,7 +66,8 @@ function TabBarCreateEntrySession({
   // inside the option render loop.
   const structuredLaunchStatusByAgent = {
     claude: useStructuredAgentLaunchStatus(worktreeId, 'claude'),
-    codex: useStructuredAgentLaunchStatus(worktreeId, 'codex')
+    codex: useStructuredAgentLaunchStatus(worktreeId, 'codex'),
+    zcode: useStructuredAgentLaunchStatus(worktreeId, 'zcode')
   }
   const isStructuredLaunchPending = (agent: TuiAgent): boolean =>
     isAgentSessionHandleProvider(agent) && structuredLaunchStatusByAgent[agent] === 'pending'

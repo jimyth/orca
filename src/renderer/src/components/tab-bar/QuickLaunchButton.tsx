@@ -122,7 +122,8 @@ function QuickLaunchAgentMenuItemsInner({
   // inside the agent list's render loop.
   const structuredLaunchStatusByAgent = {
     claude: useStructuredAgentLaunchStatus(worktreeId, 'claude'),
-    codex: useStructuredAgentLaunchStatus(worktreeId, 'codex')
+    codex: useStructuredAgentLaunchStatus(worktreeId, 'codex'),
+    zcode: useStructuredAgentLaunchStatus(worktreeId, 'zcode')
   }
 
   const openAgentSettings = useCallback(() => {
