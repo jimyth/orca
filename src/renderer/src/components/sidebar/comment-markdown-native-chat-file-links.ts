@@ -213,8 +213,12 @@ function inlineCodeFileLink(node: MarkdownNode): MarkdownNode | null {
 
 function transformFileLinks(node: MarkdownNode): void {
   if (node.type === 'link') {
-    if (node.url && routeNativeChatHref(node.url).kind === 'file') {
-      node.url = createNativeChatFileHref(node.url)
+    const route = routeNativeChatHref(node.url)
+    if (route.kind === 'file') {
+      // Why: the wrapped href carries literal location text, so URL syntax is resolved here, once.
+      node.url = createNativeChatFileHref(
+        route.line === null ? route.pathText : `${route.pathText}:${route.line}`
+      )
     }
     return
   }

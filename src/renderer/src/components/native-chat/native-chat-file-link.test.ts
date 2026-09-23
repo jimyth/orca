@@ -140,7 +140,8 @@ describe('resolveNativeChatFileLink', () => {
     expect(resolveNativeChatFileLink('docs/guide.md', context)).toEqual({
       absolutePath: '/repo/worktree/docs/guide.md',
       line: null,
-      column: null
+      column: null,
+      searchPath: 'docs/guide.md'
     })
   })
 
@@ -148,22 +149,26 @@ describe('resolveNativeChatFileLink', () => {
     expect(resolveNativeChatFileLink('src/App.tsx#L42', context)).toEqual({
       absolutePath: '/repo/worktree/src/App.tsx',
       line: 42,
-      column: null
+      column: null,
+      searchPath: 'src/App.tsx'
     })
     expect(resolveNativeChatFileLink('package.json', context)).toEqual({
       absolutePath: '/repo/worktree/package.json',
       line: null,
-      column: null
+      column: null,
+      searchPath: 'package.json'
     })
     expect(resolveNativeChatFileLink('assets/logo.png?raw=true', context)).toEqual({
       absolutePath: '/repo/worktree/assets/logo.png',
       line: null,
-      column: null
+      column: null,
+      searchPath: 'assets/logo.png'
     })
     expect(resolveNativeChatFileLink('CODEOWNERS', context)).toEqual({
       absolutePath: '/repo/worktree/CODEOWNERS',
       line: null,
-      column: null
+      column: null,
+      searchPath: 'CODEOWNERS'
     })
   })
 
@@ -171,7 +176,8 @@ describe('resolveNativeChatFileLink', () => {
     expect(resolveNativeChatFileLink('/repo/worktree/src/main.ts:12:4', context)).toEqual({
       absolutePath: '/repo/worktree/src/main.ts',
       line: 12,
-      column: 4
+      column: 4,
+      searchPath: null
     })
   })
 
@@ -179,7 +185,8 @@ describe('resolveNativeChatFileLink', () => {
     expect(resolveNativeChatFileLink('file:///repo/worktree/My%20File.md#L7', context)).toEqual({
       absolutePath: '/repo/worktree/My File.md',
       line: 7,
-      column: null
+      column: null,
+      searchPath: null
     })
   })
 
@@ -187,7 +194,8 @@ describe('resolveNativeChatFileLink', () => {
     expect(resolveNativeChatFileLink('docs/Setup%20%231.md#L3', context)).toEqual({
       absolutePath: '/repo/worktree/docs/Setup #1.md',
       line: 3,
-      column: null
+      column: null,
+      searchPath: 'docs/Setup #1.md'
     })
   })
 

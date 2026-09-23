@@ -26,6 +26,8 @@ type TerminalFileOpenDeps = {
   runtimeEnvironmentId?: string | null
   wslDistro?: string | null
   openWithSystemDefault?: boolean
+  /** Called when the path cannot be stat'ed; `isCurrent` turns false once a later click supersedes it. */
+  onMissingPath?: (isCurrent: () => boolean) => void
 }
 
 export function isHtmlFilePath(filePath: string): boolean {
@@ -167,6 +169,9 @@ export function openDetectedFilePath(
       }
       statResult = await statRuntimePath(fileContext, mappedFilePath)
     } catch {
+      if (requestId === latestOpenDetectedFilePathRequestId) {
+        deps.onMissingPath?.(() => requestId === latestOpenDetectedFilePathRequestId)
+      }
       return
     }
 

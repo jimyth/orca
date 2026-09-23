@@ -55,8 +55,13 @@ function QuickOpenContent({ visible }: { visible: boolean }): React.JSX.Element 
   const activeWorktreeId = useAppStore((s) => s.activeWorktreeId)
   const openFile = useAppStore((s) => s.openFile)
   const activeWorktree = useActiveWorktree()
+  const initialQuery = useAppStore((s) =>
+    s.activeModal === 'quick-open' && typeof s.modalData.initialQuery === 'string'
+      ? s.modalData.initialQuery
+      : ''
+  )
 
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
   const deferredQuery = useDeferredValue(query)
   const { files, loading, loadError, truncated } = useRuntimeFileListForWorktree({
     enabled: visible,
@@ -77,8 +82,8 @@ function QuickOpenContent({ visible }: { visible: boolean }): React.JSX.Element 
   const [previousVisible, setPreviousVisible] = useState(visible)
   if (visible !== previousVisible) {
     setPreviousVisible(visible)
-    if (visible && query !== '') {
-      setQuery('')
+    if (visible && query !== initialQuery) {
+      setQuery(initialQuery)
     }
   }
 

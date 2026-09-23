@@ -17556,7 +17556,10 @@
         "title": "Drop to attach to this chat",
         "subtitle": "Files are added to your message as paths the agent can read."
       },
-      "copyCode": "Copy code"
+      "copyCode": "Copy code",
+      "fileLinks": {
+        "notFound": "File not found: {{value0}}"
+      }
     },
     "tab": {
       "bar": {
