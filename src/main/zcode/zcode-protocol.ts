@@ -90,6 +90,7 @@ export const ZCODE_PROTOCOL_METHODS = {
   sessionSend: 'session/send',
   sessionSubscribe: 'session/subscribe',
   sessionStop: 'session/stop',
+  sessionCompact: 'session/compact',
   sessionEvents: 'session/events',
   runtimeCapabilities: 'runtime/capabilities'
 } as const
@@ -257,6 +258,30 @@ export type ZcodeSessionSendResult = {
   sessionId: string
   accepted: true
   stateRevision: number
+}
+
+// inputId/instructions/expectedRevision stay optional on purpose: the host
+// never correlates a pending prompt input or tracks the CAS revision, and the
+// server accepts the bare session id.
+export type ZcodeSessionCompactParams = {
+  sessionId: string
+  inputId?: string
+  instructions?: string
+  expectedRevision?: number
+}
+
+// The result is an ACK, not a completion receipt: `compact.state` says whether
+// the server started a compaction ('accepted') or already had one running
+// ('already_running'), and the converged timeline arrives afterwards through
+// session/event pushes. `snapshot` is deliberately unmodeled — the host's
+// journal reflows those events instead of syncing the snapshot.
+export type ZcodeSessionCompactResult = {
+  response: string
+  compact?: {
+    state: 'accepted' | 'already_running'
+    inputId?: string
+    operationId?: string
+  }
 }
 
 // The create result's projection.sessionId is an "unknown" placeholder; the

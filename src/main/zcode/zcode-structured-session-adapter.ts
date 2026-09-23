@@ -3,7 +3,8 @@
 // host's turn surface, and every provider frame flows back through the pure
 // Task 10 translator into journal rows and host events. Mirrors the codex
 // adapter's skeleton; the differences are deliberate and listed in the task
-// report (no rewind/compaction/background tasks/fast mode, translator is pure).
+// report (no rewind/background tasks/fast mode, compact settles at its ACK,
+// translator is pure).
 
 import type { AgentJournalMessageItem } from '../../shared/agent-session-journal-types'
 import { closeProcessRegistry } from '../../shared/child-process/close-process-registry'
@@ -30,6 +31,7 @@ import {
   defaultZcodeModelSelection
 } from './zcode-structured-session-acquire'
 import { answerZcodeStructuredPrompt } from './zcode-structured-prompt-answers'
+import { compactZcodeStructuredSession } from './zcode-structured-session-compact'
 import { deliverZcodeNotification, type ZcodeReflowWiring } from './zcode-structured-session-reflow'
 import { deliverZcodeServerRequest } from './zcode-structured-server-request-delivery'
 import {
@@ -124,10 +126,7 @@ export class ZcodeStructuredSessionAdapter implements StructuredAgentSessionAdap
     return {
       emit: (event) => this.deps.onEvent?.(event),
       forceCloseUnexpected: (reason) => {
-        const session = this.sessions.get(sessionId)
-        if (session) {
-          void session.forceCloseUnexpected(reason)
-        }
+        void this.sessions.get(sessionId)?.forceCloseUnexpected(reason)
       },
       ...(this.deps.onDispatchSettledLate
         ? { onDispatchSettledLate: this.deps.onDispatchSettledLate }
@@ -231,6 +230,11 @@ export class ZcodeStructuredSessionAdapter implements StructuredAgentSessionAdap
       throw error
     }
   }
+
+  /** Unlike codex's async thread/compact/start + terminal-event wait, the
+   * zcode RPC result is the verdict; see zcode-structured-session-compact.ts. */
+  compact: StructuredAgentSessionAdapter['compact'] = (input) =>
+    compactZcodeStructuredSession(this.sessions, input)
 
   answerPrompt: StructuredAgentSessionAdapter['answerPrompt'] = async (request) => {
     const session = this.sessions.get(request.sessionId)

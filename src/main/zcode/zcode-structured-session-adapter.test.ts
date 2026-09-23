@@ -144,6 +144,13 @@ function approvalItemId(appended: () => RecordedAppend[]): string {
   return agentJournalItemKey(row.identity)
 }
 
+function compactOf(adapter: ZcodeStructuredSessionAdapter) {
+  if (!adapter.compact) {
+    throw new Error('test expected the adapter to implement compact')
+  }
+  return adapter.compact
+}
+
 describe('ZcodeStructuredSessionAdapter.acquire', () => {
   it('sends session/create then session/subscribe and reports the provider handle', async () => {
     const zcode = fakeZcode()
@@ -775,6 +782,72 @@ describe('ZcodeStructuredSessionAdapter lifecycle', () => {
       method: 'session/stop',
       params: { sessionId: PROVIDER_SESSION_ID }
     })
+  })
+
+  it('compacts via session/compact and settles at the accepted ACK', async () => {
+    const zcode = fakeZcode({
+      'session/compact': () => ({
+        response: 'Compacting conversation',
+        compact: { state: 'accepted', operationId: 'op-1' }
+      })
+    })
+    const adapter = await acquired(zcode)
+
+    const result = await compactOf(adapter)({
+      turnId: 'compact:op-1',
+      sessionId: 'session-1',
+      fence: 7
+    })
+
+    expect(result).toEqual({})
+    expect(zcode.connections[0].calls.at(-1)).toEqual({
+      method: 'session/compact',
+      params: { sessionId: PROVIDER_SESSION_ID }
+    })
+  })
+
+  it('treats an already_running compact ACK as success', async () => {
+    const zcode = fakeZcode({
+      'session/compact': () => ({
+        response: 'Compaction already in progress',
+        compact: { state: 'already_running' }
+      })
+    })
+    const adapter = await acquired(zcode)
+
+    await expect(
+      compactOf(adapter)({ turnId: 'compact:op-2', sessionId: 'session-1', fence: 7 })
+    ).resolves.toEqual({})
+  })
+
+  it('reports a refused session/compact as a compaction error', async () => {
+    const zcode = fakeZcode({
+      'session/compact': () => {
+        throw new ZcodeAppServerRequestError(
+          'session/compact',
+          ZCODE_ERROR_CODES.sessionUnavailable,
+          'session is not available'
+        )
+      }
+    })
+    const adapter = await acquired(zcode)
+
+    await expect(
+      compactOf(adapter)({ turnId: 'compact:op-3', sessionId: 'session-1', fence: 7 })
+    ).resolves.toEqual({ error: 'session is not available' })
+  })
+
+  it('rethrows a session/compact that never settled so the host records it unconfirmed', async () => {
+    const zcode = fakeZcode({
+      'session/compact': () => {
+        throw new Error('transport died')
+      }
+    })
+    const adapter = await acquired(zcode)
+
+    await expect(
+      compactOf(adapter)({ turnId: 'compact:op-4', sessionId: 'session-1', fence: 7 })
+    ).rejects.toThrow('transport died')
   })
 
   it('closes the connection and reports a requested-close ended event', async () => {
