@@ -168,6 +168,18 @@ describe('reading a recorded launch back', () => {
     expect(isAgentLaunchResult({ ...BASE, outcome: { kind: 'terminal', handle: 't' } })).toBe(true)
   })
 
+  it.each(['visible', 'background'])('accepts a row carrying surface %s', (surface) => {
+    expect(
+      isAgentLaunchResult({ ...BASE, outcome: { kind: 'terminal', handle: 't', surface } })
+    ).toBe(true)
+  })
+
+  it('refuses a row whose surface is outside the vocabulary', () => {
+    expect(
+      isAgentLaunchResult({ ...BASE, outcome: { kind: 'terminal', handle: 't', surface: 'shown' } })
+    ).toBe(false)
+  })
+
   it('refuses a row whose pane key is not a string', () => {
     expect(
       isAgentLaunchResult({ ...BASE, outcome: { kind: 'terminal', handle: 't', paneKey: 7 } })

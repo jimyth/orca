@@ -17,7 +17,11 @@ import {
   releaseAutomationWorkspaceProvenanceRequest,
   resolveAutomationWorkspaceProvenance
 } from '../../../automations/workspace-provenance'
-import type { AgentLaunchWorkspaceFactory } from '../../../agent-launch/agent-launch-executor'
+import type {
+  AgentLaunchCreatedTerminal,
+  AgentLaunchWorkspaceFactory
+} from '../../../agent-launch/agent-launch-executor'
+import type { CreateWorktreeResult } from '../../../../shared/worktree/create-types'
 import type { RpcContext } from '../core'
 import { resolveRpcWorkspaceCreatorProvenance } from '../workspace-creator-context'
 import { buildManagedWorktreeCreateArgs } from './worktree-create-args'
@@ -96,10 +100,7 @@ export function agentLaunchWorkspaceFactory(
         finishAutomationWorkspaceProvenanceRequest(params.automationProvenanceRequest)
         return {
           worktreeId: result.worktree.id,
-          startupTerminalHandle: result.startupTerminal?.handle,
-          ...(result.startupTerminal?.paneKey
-            ? { startupTerminalPaneKey: result.startupTerminal.paneKey }
-            : {}),
+          ...launchStartupTerminal(result.startupTerminal),
           // Carried, not dropped: `createManagedWorktree` reports a failed startup terminal or an
           // uncopied working tree here, and it is the only place the host says so.
           ...(result.warning ? { warning: result.warning } : {})
@@ -108,6 +109,21 @@ export function agentLaunchWorkspaceFactory(
         releaseAutomationWorkspaceProvenanceRequest(params.automationProvenanceRequest)
         throw error
       }
+    }
+  }
+}
+
+function launchStartupTerminal(terminal: CreateWorktreeResult['startupTerminal']): {
+  startupTerminal?: AgentLaunchCreatedTerminal
+} {
+  if (!terminal?.handle) {
+    return {}
+  }
+  return {
+    startupTerminal: {
+      handle: terminal.handle,
+      ...(terminal.paneKey ? { paneKey: terminal.paneKey } : {}),
+      ...(terminal.surface ? { surface: terminal.surface } : {})
     }
   }
 }

@@ -82,9 +82,9 @@ export const AgentLaunch = z.object({
    */
   launchSource: z.string().optional(),
   /**
-   * `background`: the caller draws the terminal from the reported `paneKey`, so the host skips its
-   * reveal; a structured chat is still published, just not activated. Gate on
-   * `AGENT_LAUNCH_PRESENTATION_RUNTIME_CAPABILITY` — an older host ignores this and reveals.
+   * `background`: the host skips its terminal reveal (the outcome's `surface` says whether it
+   * revealed); a structured chat is still published, just not activated. Gate on
+   * `AGENT_LAUNCH_PRESENTATION_RUNTIME_CAPABILITY` — an older host ignores this.
    * No `focused`: it routes `createTerminal` to the renderer-backed path (no `paneKey`, no launch
    * telemetry), and unlike sibling methods nothing clamps it for remote callers.
    */

@@ -12,7 +12,10 @@
  * receipt rather than requested here.
  */
 
-import type { RuntimeTerminalPresentation } from './runtime-terminal-contracts'
+import type {
+  RuntimeTerminalCreate,
+  RuntimeTerminalPresentation
+} from './runtime-terminal-contracts'
 import type { TuiAgent } from './tui-agent'
 
 /** How a launch's initial text reaches the agent. */
@@ -88,7 +91,7 @@ export type AgentLaunchIntent = {
    */
   launchSource?: string
   /** `background` when the caller presents the surface: no terminal reveal, no chat activation.
-   *  Not a route input and not fingerprinted — the same agent runs either way. */
+   *  Not fingerprinted: a replay reports the first attempt's `surface`, which callers act on. */
   presentation?: AgentLaunchPresentation
 }
 
@@ -114,7 +117,17 @@ export type AgentLaunchOutcome =
        * or when the runtime could not report the pane it created.
        */
       paneKey?: string
+      /**
+       * Whether the host revealed this pane. `background` covers a caller's opt-out, a host with no
+       * window and a failed reveal alike, so draw a tab from `paneKey` only on `background`; absent
+       * (a reused terminal, or an older host) means the host owns the tab.
+       */
+      surface?: AgentLaunchTerminalSurface
     }
+
+export type AgentLaunchTerminalOutcome = Extract<AgentLaunchOutcome, { kind: 'terminal' }>
+
+export type AgentLaunchTerminalSurface = NonNullable<RuntimeTerminalCreate['surface']>
 /**
  * What became of the launch text.
  *
@@ -241,6 +254,7 @@ function isAgentLaunchOutcome(value: unknown): value is AgentLaunchOutcome {
     handle?: unknown
     sessionId?: unknown
     paneKey?: unknown
+    surface?: unknown
   }
   if (typeof outcome.handle !== 'string' || outcome.handle.length === 0) {
     return false
@@ -249,7 +263,10 @@ function isAgentLaunchOutcome(value: unknown): value is AgentLaunchOutcome {
     ? // Checked when present, ignored when absent: a row written before this field existed, or by a
       // runtime that minted no pane, still reads. Deliberately not parsed — a read-side shape rule
       // stricter than the write side turns one odd row into a refused replay.
-      outcome.paneKey === undefined || typeof outcome.paneKey === 'string'
+      (outcome.paneKey === undefined || typeof outcome.paneKey === 'string') &&
+        (outcome.surface === undefined ||
+          outcome.surface === 'visible' ||
+          outcome.surface === 'background')
     : outcome.kind === 'structured' &&
         typeof outcome.sessionId === 'string' &&
         outcome.sessionId.length > 0

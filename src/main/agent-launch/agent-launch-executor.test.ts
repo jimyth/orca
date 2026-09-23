@@ -41,7 +41,7 @@ function harness(options: {
       calls.push(`createWorktree(startupAgent=${String(args.startupAgent)})`)
       return {
         worktreeId: 'wt-new',
-        startupTerminalHandle: args.startupAgent ? 'term_agent_first' : undefined
+        ...(args.startupAgent ? { startupTerminal: { handle: 'term_agent_first' } } : {})
       }
     }
   )

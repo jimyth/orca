@@ -32,6 +32,9 @@ export type AgentLaunchRuntimeStubOptions = {
   terminalPaneKey?: string
   /** The pane minted with an agent-first worktree's startup terminal. */
   startupTerminalPaneKey?: string
+  /** Whether the runtime revealed the terminal it created; off by default, like `paneKey`. */
+  terminalSurface?: 'visible' | 'background'
+  startupTerminalSurface?: 'visible' | 'background'
 }
 
 export function runtimeStub(options: AgentLaunchRuntimeStubOptions = {}) {
@@ -68,7 +71,8 @@ export function runtimeStub(options: AgentLaunchRuntimeStubOptions = {}) {
       startupTerminal: args.startupAgent
         ? {
             handle: 'term_agent_first',
-            ...(options.startupTerminalPaneKey ? { paneKey: options.startupTerminalPaneKey } : {})
+            ...(options.startupTerminalPaneKey ? { paneKey: options.startupTerminalPaneKey } : {}),
+            ...(options.startupTerminalSurface ? { surface: options.startupTerminalSurface } : {})
           }
         : undefined,
       ...(options.setupReceipt ? { setupReceipt: options.setupReceipt } : {}),
@@ -78,6 +82,7 @@ export function runtimeStub(options: AgentLaunchRuntimeStubOptions = {}) {
     createTerminal: vi.fn(async (_selector: string, _options?: Record<string, unknown>) => ({
       handle: 'term_1',
       ...(options.terminalPaneKey ? { paneKey: options.terminalPaneKey } : {}),
+      ...(options.terminalSurface ? { surface: options.terminalSurface } : {}),
       ...(options.terminalWarning ? { warning: options.terminalWarning } : {})
     })),
     showTerminal: vi.fn(async (handle: string) => ({ handle, worktreeId: 'wt-7' })),

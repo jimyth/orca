@@ -116,6 +116,7 @@ export function agentLaunchSurfaceFactory(
         // The runtime already minted this pane and baked it into the PTY's env and its own reveal;
         // dropping it here was what left a client with no way to name the tab it just asked for.
         ...(terminal.paneKey ? { paneKey: terminal.paneKey } : {}),
+        ...(terminal.surface ? { surface: terminal.surface } : {}),
         ...(terminal.warning ? { warning: terminal.warning } : {})
       }
     },

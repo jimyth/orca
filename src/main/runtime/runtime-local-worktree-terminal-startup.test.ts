@@ -86,6 +86,30 @@ describe('startRuntimeLocalWorktreeTerminals startup presentation', () => {
     expect(options).not.toHaveProperty('presentation')
   })
 
+  it.each(['visible', 'background'] as const)(
+    'returns the surface the runtime produced (%s)',
+    async (surface) => {
+      const { ports, createTerminal } = createPorts()
+      createTerminal.mockResolvedValue({
+        handle: 'term-1',
+        worktreeId: worktree.id,
+        title: null,
+        surface
+      })
+
+      const result = await startRuntimeLocalWorktreeTerminals({
+        request: { repoSelector: `id:${repo.id}`, name: worktree.displayName },
+        repo,
+        worktree,
+        createdWithAgent: 'codex',
+        startup: { command: 'codex' },
+        ports
+      })
+
+      expect(result.startupTerminalSurface).toBe(surface)
+    }
+  )
+
   it.each([
     ['background', null],
     [undefined, 'term-1']

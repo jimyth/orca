@@ -159,7 +159,7 @@ export async function createRuntimeFolderWorktree(args: {
         ...(terminal.tabId ? { tabId: terminal.tabId } : {}),
         ...(terminal.paneKey ? { paneKey: terminal.paneKey } : {}),
         ...(terminal.ptyId ? { ptyId: terminal.ptyId } : {}),
-        surface: 'background'
+        ...(terminal.surface ? { surface: terminal.surface } : {})
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

@@ -78,6 +78,22 @@ describe('a remote managed create with a startup agent', () => {
     expect(await startupTerminalOptions()).not.toHaveProperty('presentation')
   })
 
+  it.each(['visible', 'background'] as const)(
+    'reports the surface the runtime produced (%s) rather than assuming one',
+    async (surface) => {
+      const { createTerminal, deps } = createDeps()
+      createTerminal.mockResolvedValue({ handle: 'term-1', surface })
+
+      const result = await createRuntimeRemoteManagedWorktree(
+        repo,
+        { name: 'task', createdWithAgent: 'codex', startup: { command: 'codex' } },
+        deps
+      )
+
+      expect(result.startupTerminal).toEqual({ spawned: true, handle: 'term-1', surface })
+    }
+  )
+
   it.each([
     ['background', null],
     [undefined, 'term-1']

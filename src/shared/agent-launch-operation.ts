@@ -49,7 +49,8 @@ export type AgentLaunchFingerprintInput = {
    * digest covers what the call DOES — and the cost of leaving it out is only that a replay reports
    * the first attempt's attribution, which is the truthful answer: one launch happened.
    *
-   * `presentation` is out too: the same agent runs either way, and a replay builds no surface.
+   * `presentation` is out too: the same agent runs either way, and a replay reports the first
+   * attempt's `surface`, which is what the caller decides from.
    */
 }
 

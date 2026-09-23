@@ -224,7 +224,8 @@ export class OrcaRuntimeWithCreateManagedWorktree extends OrcaRuntimeWithGetWork
       startupTerminalHandle,
       startupTerminalTabId,
       startupTerminalPaneKey,
-      startupTerminalPtyId
+      startupTerminalPtyId,
+      startupTerminalSurface
     } = await startRuntimeLocalWorktreeTerminals({
       request: args,
       repo,
@@ -309,7 +310,7 @@ export class OrcaRuntimeWithCreateManagedWorktree extends OrcaRuntimeWithGetWork
               ...(startupTerminalTabId ? { tabId: startupTerminalTabId } : {}),
               ...(startupTerminalPaneKey ? { paneKey: startupTerminalPaneKey } : {}),
               ...(startupTerminalPtyId ? { ptyId: startupTerminalPtyId } : {}),
-              surface: 'background' as const
+              ...(startupTerminalSurface ? { surface: startupTerminalSurface } : {})
             }
           }
         : {})

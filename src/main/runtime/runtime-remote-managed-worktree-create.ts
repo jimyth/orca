@@ -1,5 +1,6 @@
 import type { CreateWorktreeResult } from '../../shared/worktree/create-types'
 import type { Repo } from '../../shared/repo-types'
+import type { RuntimeTerminalCreate } from '../../shared/runtime-types'
 import { getSetupRunnerCommandPlatformForPath } from '../../shared/setup-runner-command'
 import { createSequencedSetupAgentCommands } from '../../shared/setup-agent-sequencing'
 import type { RuntimeStore } from './runtime-store-contract'
@@ -31,6 +32,7 @@ type Dependencies = {
     tabId?: string | null
     paneKey?: string | null
     ptyId?: string | null
+    surface?: RuntimeTerminalCreate['surface']
   }>
   pasteDraft(handle: string, draft: WorktreeStartupDraftPaste): void
   sendFollowup(handle: string, followup: WorktreeStartupFollowup): void
@@ -83,6 +85,7 @@ export async function createRuntimeRemoteManagedWorktree(
   let startupTerminalTabId: string | null = null
   let startupTerminalPaneKey: string | null = null
   let startupTerminalPtyId: string | null = null
+  let startupTerminalSurface: RuntimeTerminalCreate['surface'] | null = null
 
   let sequencedStartup = args.startup
   let wrappedSetupCommandStr: string | undefined
@@ -134,6 +137,7 @@ export async function createRuntimeRemoteManagedWorktree(
       startupTerminalTabId = terminal.tabId ?? null
       startupTerminalPaneKey = terminal.paneKey ?? null
       startupTerminalPtyId = terminal.ptyId ?? null
+      startupTerminalSurface = terminal.surface ?? null
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       warning = warning
@@ -249,6 +253,7 @@ export async function createRuntimeRemoteManagedWorktree(
     startupTerminalHandle,
     startupTerminalTabId,
     startupTerminalPaneKey,
-    startupTerminalPtyId
+    startupTerminalPtyId,
+    startupTerminalSurface
   })
 }

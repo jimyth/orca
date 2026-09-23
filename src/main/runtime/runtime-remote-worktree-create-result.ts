@@ -1,4 +1,5 @@
 import type { CreateWorktreeResult } from '../../shared/worktree/create-types'
+import type { RuntimeTerminalCreate } from '../../shared/runtime-types'
 import type { RuntimeRemoteWorktreeCreateArgs } from './runtime-remote-worktree-create-request'
 
 export function finishRuntimeRemoteWorktreeCreate(args: {
@@ -13,6 +14,7 @@ export function finishRuntimeRemoteWorktreeCreate(args: {
   startupTerminalTabId: string | null
   startupTerminalPaneKey: string | null
   startupTerminalPtyId: string | null
+  startupTerminalSurface: RuntimeTerminalCreate['surface'] | null
 }): CreateWorktreeResult {
   const returnedSetup = args.didSpawnSetup
     ? undefined
@@ -40,7 +42,7 @@ export function finishRuntimeRemoteWorktreeCreate(args: {
             ...(args.startupTerminalTabId ? { tabId: args.startupTerminalTabId } : {}),
             ...(args.startupTerminalPaneKey ? { paneKey: args.startupTerminalPaneKey } : {}),
             ...(args.startupTerminalPtyId ? { ptyId: args.startupTerminalPtyId } : {}),
-            surface: 'background' as const
+            ...(args.startupTerminalSurface ? { surface: args.startupTerminalSurface } : {})
           }
         }
       : resultForRenderer

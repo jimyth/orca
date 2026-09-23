@@ -36,6 +36,8 @@ const EXISTING_LAUNCH = {
   target: { kind: 'existing', worktree: 'id:wt-7' }
 }
 
+const PANE_KEY = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d:3f2504e0-4f89-41d3-9a0c-0305e82c3301'
+
 const CREATE_LAUNCH = {
   agent: 'claude',
   target: { kind: 'create-worktree', create: { repo: 'id:repo-1', name: 'task' } }
@@ -94,13 +96,37 @@ describe('a launch into an existing workspace', () => {
   })
 
   it('still reports the pane the caller needs in order to present it', async () => {
-    const PANE_KEY = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d:3f2504e0-4f89-41d3-9a0c-0305e82c3301'
-    const runtime = runtimeStub({ settings: TERMINAL_ONLY, terminalPaneKey: PANE_KEY })
+    const runtime = runtimeStub({
+      settings: TERMINAL_ONLY,
+      terminalPaneKey: PANE_KEY,
+      terminalSurface: 'background'
+    })
 
     const result = await launch({ ...EXISTING_LAUNCH, presentation: 'background' }, runtime)
 
-    expect(result.outcome).toEqual({ kind: 'terminal', handle: 'term_1', paneKey: PANE_KEY })
+    expect(result.outcome).toEqual({
+      kind: 'terminal',
+      handle: 'term_1',
+      paneKey: PANE_KEY,
+      surface: 'background'
+    })
   })
+
+  // The request is what the caller asked for; only the runtime knows whether a reveal happened.
+  it.each(['visible', 'background'] as const)(
+    'reports the surface the runtime says it produced (%s), whatever was requested',
+    async (terminalSurface) => {
+      const runtime = runtimeStub({ settings: TERMINAL_ONLY, terminalSurface })
+
+      const result = await launch(EXISTING_LAUNCH, runtime)
+
+      expect(result.outcome).toEqual({
+        kind: 'terminal',
+        handle: 'term_1',
+        surface: terminalSurface
+      })
+    }
+  )
 })
 
 describe('a launch that creates its workspace', () => {
@@ -123,6 +149,21 @@ describe('a launch that creates its workspace', () => {
       'startupPresentation'
     )
   })
+
+  it.each(['visible', 'background'] as const)(
+    'reports whether the create revealed its startup terminal (%s)',
+    async (startupTerminalSurface) => {
+      const runtime = runtimeStub({ settings: TERMINAL_ONLY, startupTerminalSurface })
+
+      const result = await launch({ ...CREATE_LAUNCH, presentation: 'background' }, runtime)
+
+      expect(result.outcome).toEqual({
+        kind: 'terminal',
+        handle: 'term_agent_first',
+        surface: startupTerminalSurface
+      })
+    }
+  )
 
   it('names the sibling startupPresentation, not a bare presentation, on the runtime args', async () => {
     const runtime = runtimeStub({ settings: TERMINAL_ONLY })

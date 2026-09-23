@@ -105,7 +105,8 @@ describe('runtime local create prepared-pool re-arm ordering', () => {
         startupTerminalHandle: undefined,
         startupTerminalTabId: undefined,
         startupTerminalPaneKey: undefined,
-        startupTerminalPtyId: undefined
+        startupTerminalPtyId: undefined,
+        startupTerminalSurface: undefined
       }
     })
   })
@@ -130,4 +131,29 @@ describe('runtime local create prepared-pool re-arm ordering', () => {
     // The prepared checkout was consumed before the failure, so the replacement is still owed.
     expect(calls.order).toEqual(['rearm'])
   })
+})
+
+describe('runtime local create startup terminal result', () => {
+  it.each(['visible', 'background'] as const)(
+    'reports the surface the startup terminal came up in (%s)',
+    async (surface) => {
+      startTerminalsMock.mockResolvedValueOnce({
+        didSpawnSetup: false,
+        didSpawnStartup: true,
+        setupTerminalHandle: null,
+        startupTerminalHandle: 'term-1',
+        startupTerminalTabId: null,
+        startupTerminalPaneKey: null,
+        startupTerminalPtyId: null,
+        startupTerminalSurface: surface
+      })
+
+      const result = await makeRuntime().createManagedWorktree({
+        repoSelector: 'repo-1',
+        name: 'app'
+      })
+
+      expect(result.startupTerminal).toEqual({ spawned: true, handle: 'term-1', surface })
+    }
+  )
 })

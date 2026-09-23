@@ -273,8 +273,8 @@ export const AGENT_LAUNCH_REPLAY_RUNTIME_CAPABILITY = 'agent.launch.replay.v1' a
 export const AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY =
   'agent.launch.replay-required.v1' as const
 
-// Why: an older host strips agent.launch's `presentation` and reveals anyway, yet its reply
-// looks like success, so a caller drawing its own tab would draw a second one.
+// Why: an older host strips agent.launch's `presentation` and activates a structured chat the
+// caller asked to keep in the background; nothing in its reply shows that happened.
 export const AGENT_LAUNCH_PRESENTATION_RUNTIME_CAPABILITY = 'agent.launch.presentation.v1' as const
 
 // Generic native clients include the CLI and must not claim Electron-only page

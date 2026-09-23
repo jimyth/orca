@@ -67,4 +67,27 @@ describe('a folder workspace create with a startup agent', () => {
   it('leaves the reveal in place when no presentation was asked for', async () => {
     expect(await startupTerminalOptions()).not.toHaveProperty('presentation')
   })
+
+  it.each(['visible', 'background'] as const)(
+    'reports the surface the runtime produced (%s) rather than assuming one',
+    async (surface) => {
+      const { createTerminal, deps } = createDeps()
+      createTerminal.mockResolvedValue({
+        handle: 'term-1',
+        worktreeId: 'folder-1',
+        title: null,
+        surface
+      })
+
+      const result = await createRuntimeFolderWorktree({
+        request: { repoSelector: `id:${repo.id}`, name: 'task' },
+        repo,
+        createdWithAgent: 'codex',
+        startup: { command: 'codex' },
+        deps
+      })
+
+      expect(result.startupTerminal).toEqual({ spawned: true, handle: 'term-1', surface })
+    }
+  )
 })

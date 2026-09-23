@@ -48,6 +48,7 @@ export type RuntimeLocalWorktreeTerminalStartupResult = {
   startupTerminalTabId: string | null
   startupTerminalPaneKey: string | null
   startupTerminalPtyId: string | null
+  startupTerminalSurface: RuntimeTerminalCreate['surface'] | null
 }
 
 export async function startRuntimeLocalWorktreeTerminals(args: {
@@ -73,6 +74,7 @@ export async function startRuntimeLocalWorktreeTerminals(args: {
   let startupTerminalTabId: string | null = null
   let startupTerminalPaneKey: string | null = null
   let startupTerminalPtyId: string | null = null
+  let startupTerminalSurface: RuntimeTerminalCreate['surface'] | null = null
   let sequencedStartup = startup
   let wrappedSetupCommand: string | undefined
   if (startup && setup?.waitForAgentStartup === true) {
@@ -122,6 +124,7 @@ export async function startRuntimeLocalWorktreeTerminals(args: {
       startupTerminalTabId = terminal.tabId ?? null
       startupTerminalPaneKey = terminal.paneKey ?? null
       startupTerminalPtyId = terminal.ptyId ?? null
+      startupTerminalSurface = terminal.surface ?? null
     } catch (error) {
       warning = appendFailure(warning, worktree.path, 'startup', error)
     }
@@ -190,7 +193,8 @@ export async function startRuntimeLocalWorktreeTerminals(args: {
     startupTerminalHandle,
     startupTerminalTabId,
     startupTerminalPaneKey,
-    startupTerminalPtyId
+    startupTerminalPtyId,
+    startupTerminalSurface
   }
 }
 

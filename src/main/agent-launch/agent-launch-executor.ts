@@ -30,7 +30,8 @@ import type {
   AgentLaunchPresentation,
   AgentLaunchPrompt,
   AgentLaunchResult,
-  AgentLaunchTarget
+  AgentLaunchTarget,
+  AgentLaunchTerminalOutcome
 } from '../../shared/agent-launch-intent'
 import { withoutReservedAgentCreateFields } from '../../shared/agent-launch-intent'
 import {
@@ -85,7 +86,7 @@ export type AgentLaunchSurfaceFactory = {
     presentation?: AgentLaunchPresentation
     /** `paneKey` names the pane this create minted, for a caller that presents its own tabs; a
      *  factory whose runtime does not report one omits it rather than inventing a key. */
-  }): Promise<{ handle: string; paneKey?: string; warning?: string }>
+  }): Promise<AgentLaunchCreatedTerminal & { warning?: string }>
   /**
    * Commits the launch text as the session's first turn, answering with the transcript row's id.
    *
@@ -108,6 +109,9 @@ export type AgentLaunchSurfaceFactory = {
    */
   deliverTerminalPrompt?(args: { handle: string; prompt: AgentLaunchPrompt }): Promise<boolean>
 }
+
+/** A terminal this launch created, as its outcome reports it. */
+export type AgentLaunchCreatedTerminal = Omit<AgentLaunchTerminalOutcome, 'kind'>
 
 /** `fence` is carried out of the create because a send must name the lease it was admitted against,
  *  and re-reading it later would read whatever fence the session has by then. */
@@ -148,9 +152,8 @@ export type AgentLaunchWorkspaceFactory = {
     presentation?: AgentLaunchPresentation
   }): Promise<{
     worktreeId: string
-    startupTerminalHandle: string | undefined
-    /** The pane minted with the startup terminal, when the runtime reported one. */
-    startupTerminalPaneKey?: string
+    /** The agent-first startup terminal, when the create spawned one. */
+    startupTerminal?: AgentLaunchCreatedTerminal
     /** Created, but incomplete — surfaced on the launch result rather than dropped. */
     warning?: string
   }>
@@ -199,13 +202,10 @@ export async function executeAgentLaunch(
 
   const placed = await resolveWorkspace(execution, preflight)
   // Agent-first creation already produced the agent, so the pre-flight verdict is final.
-  if (placed.startupTerminalHandle) {
+  const startup = placed.startupTerminal
+  if (startup) {
     return {
-      outcome: {
-        kind: 'terminal',
-        handle: placed.startupTerminalHandle,
-        ...(placed.startupTerminalPaneKey ? { paneKey: placed.startupTerminalPaneKey } : {})
-      },
+      outcome: terminalOutcome(startup),
       worktreeId: placed.worktreeId,
       receipt: preflight,
       ...(placed.warning ? { warning: placed.warning } : {}),
@@ -213,7 +213,7 @@ export async function executeAgentLaunch(
         intent,
         placed.promptRodeLaunchCommand
           ? HANDED_TO_TERMINAL
-          : await deliverTerminalLaunchPrompt(execution, placed.startupTerminalHandle)
+          : await deliverTerminalLaunchPrompt(execution, startup.handle)
       )
     }
   }
@@ -282,8 +282,7 @@ async function resolveWorkspace(
   preflight: AgentLaunchModeReceipt
 ): Promise<{
   worktreeId: string
-  startupTerminalHandle: string | undefined
-  startupTerminalPaneKey?: string
+  startupTerminal?: AgentLaunchCreatedTerminal
   warning?: string
   /** True when this create folded the prompt into the agent's startup command. */
   promptRodeLaunchCommand?: boolean
@@ -291,7 +290,7 @@ async function resolveWorkspace(
   const { intent } = execution
   if (intent.target.kind === 'existing') {
     // Nothing was created, so there is no create warning to carry.
-    return { worktreeId: intent.target.worktree, startupTerminalHandle: undefined }
+    return { worktreeId: intent.target.worktree }
   }
   const workspaces = execution.workspaces
   if (!workspaces) {
@@ -318,7 +317,7 @@ async function resolveWorkspace(
   })
   // Only when a startup terminal actually came back: a create that produced none ran no command,
   // so nothing carried the prompt and the launch still owes it to whatever surface it builds next.
-  return created.startupTerminalHandle && startupPrompt
+  return created.startupTerminal && startupPrompt
     ? { ...created, promptRodeLaunchCommand: true }
     : created
 }
@@ -401,13 +400,19 @@ async function createTerminalSurface(
     ...(intent.presentation ? { presentation: intent.presentation } : {})
   })
   return {
-    outcome: {
-      kind: 'terminal',
-      handle: terminal.handle,
-      ...(terminal.paneKey ? { paneKey: terminal.paneKey } : {})
-    },
+    outcome: terminalOutcome(terminal),
     ...(terminal.warning ? { warning: terminal.warning } : {}),
     ...(startupPrompt ? { promptRodeLaunchCommand: true } : {})
+  }
+}
+
+/** Copied field by field: the outcome is persisted, so nothing a factory adds may ride along. */
+function terminalOutcome(terminal: AgentLaunchCreatedTerminal): AgentLaunchTerminalOutcome {
+  return {
+    kind: 'terminal',
+    handle: terminal.handle,
+    ...(terminal.paneKey ? { paneKey: terminal.paneKey } : {}),
+    ...(terminal.surface ? { surface: terminal.surface } : {})
   }
 }
 
