@@ -63,6 +63,10 @@ export const ProviderHandle = z.discriminatedUnion('kind', [
     .strict()
 ])
 
+/** Zcode is deliberately NOT a client-supplied handle arm: the adapter creates the provider
+ *  session and mints the durable identity itself, and a client-named conversation this host
+ *  cannot resume would be a lying attach. Widen this union only when zcode resume lands. */
+
 export const ExecutionHostId = z
   .string()
   .max(MAX_ID_LENGTH)
@@ -82,7 +86,7 @@ export const ExecutionLocation = z
 
 export const AccountHome = z
   .object({
-    variable: z.enum(['CLAUDE_CONFIG_DIR', 'CODEX_HOME']),
+    variable: z.enum(['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'ZCODE_HOME']),
     path: z.string().min(1).max(4096)
   })
   .strict()
@@ -91,7 +95,7 @@ export const AttachParams = z
   .object({
     envelope: MutationEnvelope,
     location: ExecutionLocation,
-    provider: z.enum(['codex', 'claude']),
+    provider: z.enum(['codex', 'claude', 'zcode']),
     agent: Identifier('Invalid agent'),
     accountHome: AccountHome,
     runtimeKind: z.enum(['native', 'tui']),
@@ -112,7 +116,7 @@ export const CreateIntentParams = z
   .object({
     envelope: MutationEnvelope,
     worktree: Identifier('Invalid worktree selector'),
-    agent: z.enum(['claude', 'codex']),
+    agent: z.enum(['claude', 'codex', 'zcode']),
     resumeFrom: ResumeSource.optional()
   })
   .strict()
@@ -122,7 +126,7 @@ export const CreateParams = z.union([AttachParams, CreateIntentParams])
 export const CreateSupportParams = z
   .object({
     worktree: Identifier('Invalid worktree selector'),
-    agent: z.enum(['claude', 'codex'])
+    agent: z.enum(['claude', 'codex', 'zcode'])
   })
   .strict()
 

@@ -5,6 +5,7 @@ import { agentSessionOwnerBindingsEqual } from '../../shared/claimed-agent-pty-o
 import { resolvePinnedCodexRolloutProof } from '../codex/codex-tui-rollout-proof'
 import { supportsCodexStructuredLocation } from '../codex/codex-structured-location-support'
 import { supportsClaudeStructuredLocation } from '../claude/claude-structured-location-support'
+import { supportsZcodeStructuredLocation } from '../zcode/zcode-structured-location-support'
 import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
 import { resolveStructuredAgentSessionCreateSupport } from '../native-chat/structured-agent-session-create-support'
 import {
@@ -19,7 +20,7 @@ import { getSystemCodexHomePath } from '../codex/codex-home-paths'
 import { resolveTuiAgentLaunchEnv } from '../../shared/tui-agent-launch-defaults'
 import type { AgentSessionHandleProvider } from '../../shared/agent-session-provider-handle'
 import { resolveStructuredLaunchSeedOptions } from '../../shared/native-chat-session-option-defaults'
-import { hasPersistedStructuredAgentSessionStore as hasPersistedStructuredAgentSessionStoreOnDisk } from './structured-agent-session-runtime'
+import { hasPersistedStructuredAgentSessionStore as hasPersistedStructuredAgentSessionStoreOnDisk } from './agent-session-record-store-file'
 import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -69,9 +70,7 @@ export class OrcaRuntimeWithResolveRecoveredStructuredTuiTranscript extends Orca
           ? supportsClaudeStructuredLocation(location)
           : agent === 'codex'
             ? supportsCodexStructuredLocation(location)
-            : // ZCode rides the app-server lane; its create support lands with the adapter, so a
-              // create must fail closed instead of borrowing Codex's location verdict.
-              false,
+            : supportsZcodeStructuredLocation(location),
       getSettings: () => this.requireStore().getSettings()
     })
   }
@@ -135,9 +134,14 @@ export class OrcaRuntimeWithResolveRecoveredStructuredTuiTranscript extends Orca
     resumeFrom?: { providerSessionId: string }
   }): Promise<AgentSessionAttachParams> {
     if (input.agent === 'zcode') {
-      // ZCode creates arrive over the app-server adapter, not the claude/codex account-home
-      // resolution below; until that lands, fail closed rather than resolve a Codex home.
-      throw new Error('structured_agent_session_unsupported')
+      if (input.resumeFrom) {
+        // The app-server adapter always session/creates; adopting a named conversation would
+        // resolve it through a Codex home scan and hand back a blank chat wearing the old name.
+        throw new Error('structured_agent_session_unsupported')
+      }
+      // Zcode has no managed account home: app-server reads the user's real ~/.zcode, and the
+      // launch resolver never reads this value back — it exists so record and wire agree.
+      return this.resolveStructuredAgentSessionIntent(input, async () => join(homedir(), '.zcode'))
     }
     if (input.agent === 'claude') {
       return this.resolveStructuredAgentSessionIntent(input, async ({ launchEnv, location }) => {
@@ -237,7 +241,12 @@ export class OrcaRuntimeWithResolveRecoveredStructuredTuiTranscript extends Orca
       provider: input.agent,
       agent: input.agent,
       accountHome: {
-        variable: input.agent === 'claude' ? 'CLAUDE_CONFIG_DIR' : 'CODEX_HOME',
+        variable:
+          input.agent === 'claude'
+            ? 'CLAUDE_CONFIG_DIR'
+            : input.agent === 'zcode'
+              ? 'ZCODE_HOME'
+              : 'CODEX_HOME',
         path: adoption ? adoption.accountHomePath : selectedAccountHomePath
       },
       ...(options ? { options } : {}),

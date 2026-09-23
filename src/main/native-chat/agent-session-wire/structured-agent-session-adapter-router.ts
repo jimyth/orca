@@ -5,7 +5,7 @@ import type {
 } from '../../../shared/agent-session-record'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 
-type RoutedAgent = 'claude' | 'codex'
+type RoutedAgent = 'claude' | 'codex' | 'zcode'
 type SessionRoute = { adapter: StructuredAgentSessionAdapter; state: 'live' | 'stopped' }
 
 export class StructuredAgentSessionAdapterRouter implements StructuredAgentSessionAdapter {
@@ -211,6 +211,8 @@ export class StructuredAgentSessionAdapterRouter implements StructuredAgentSessi
   }
 
   private adapterForAgent(agent: string): StructuredAgentSessionAdapter | null {
-    return agent === 'claude' || agent === 'codex' ? this.adapters[agent] : null
+    return agent === 'claude' || agent === 'codex' || agent === 'zcode'
+      ? this.adapters[agent]
+      : null
   }
 }

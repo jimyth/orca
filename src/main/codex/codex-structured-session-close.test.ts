@@ -186,7 +186,7 @@ describe('Codex structured session close lifecycle', () => {
   it('routes Codex sink-failure recovery through force-close and preserves unexpected-exit settlement', async () => {
     const { adapter, connections, events } = adapterFixture()
     const router = new StructuredAgentSessionAdapterRouter(
-      { claude: claudeAdapterStub(), codex: adapter },
+      { claude: claudeAdapterStub(), codex: adapter, zcode: claudeAdapterStub() },
       async () => {}
     )
     await router.acquire({ identity: identity('session-1'), fence: 7, spawnToken: 'spawn-1' })

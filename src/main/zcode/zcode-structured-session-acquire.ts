@@ -29,7 +29,14 @@ const SESSION_SUBSCRIBE_DELIVERY_KIND = 'desktop-continuous'
 
 /** Last-resort model selection matching the shipped zcode config default
  * (provider.builtin:bigmodel + model.main GLM-5.3, reasoning max); a real
- * session prefers the create-result echo or the injected resolver. */
+ * session prefers the create-result echo or the injected resolver.
+ *
+ * UNVERIFIED SOURCE: the provider id `builtin:bigmodel` was read from this
+ * machine's legacy ~/.zcode config, not confirmed against a clean install —
+ * the local spike ran `bigmodel-spike`. The runtime's injectable
+ * resolveModelSelection is the correction path; the real-binary tests must
+ * empirically confirm (or replace) this constant before it can be trusted
+ * cross-environment. */
 export function defaultZcodeModelSelection(): ZcodeSessionSendParams['modelSelection'] {
   return {
     providerId: 'builtin:bigmodel',

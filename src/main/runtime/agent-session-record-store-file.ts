@@ -8,6 +8,7 @@
  */
 
 import { createHash } from 'node:crypto'
+import { existsSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
@@ -58,6 +59,18 @@ export type LoadedAgentSessionStore = {
 
 export function agentSessionStorePath(directory: string): string {
   return join(directory, AGENT_SESSION_STORE_FILE_NAME)
+}
+
+/** Sibling of the journal tree rather than inside it: one file adjudicates every
+ *  session's lease, while a journal is per session. */
+export const AGENT_SESSION_RECORD_STORE_DIR_NAME = 'agent-sessions'
+
+export function hasPersistedStructuredAgentSessionStore(
+  stateDirectory: string,
+  fileExists: (path: string) => boolean = existsSync
+): boolean {
+  const filePath = agentSessionStorePath(join(stateDirectory, AGENT_SESSION_RECORD_STORE_DIR_NAME))
+  return fileExists(filePath) || fileExists(`${filePath}.bak`)
 }
 
 function emptyState(hostId: string): AgentSessionStoreState {

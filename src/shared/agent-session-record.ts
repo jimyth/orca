@@ -39,7 +39,7 @@ export type AgentSessionExecutionLocation = {
 
 /** Account root pinned at launch by the account selector, so a resume cannot drift to another login. */
 export type AgentSessionAccountHome = {
-  variable: 'CLAUDE_CONFIG_DIR' | 'CODEX_HOME'
+  variable: 'CLAUDE_CONFIG_DIR' | 'CODEX_HOME' | 'ZCODE_HOME'
   /** Host-resolved absolute path in the execution host's own path syntax. */
   path: string
 }
@@ -165,17 +165,13 @@ export function isAgentSessionId(value: unknown): value is string {
   return typeof value === 'string' && SESSION_ID_PATTERN.test(value)
 }
 
-/** NUL cannot occur in a host id, distro name, or workspace id, so no component can forge a join. */
-const SCOPE_KEY_SEPARATOR = '\u0000'
-
 /**
  * Scope key for host-and-workspace isolation. Native, WSL, and SSH copies of one workspace id are
  * different sessions; collapsing them would let one host adjudicate another host's lease.
+ * NUL cannot occur in a host id, distro name, or workspace id, so no component can forge a join.
  */
 export function agentSessionScopeKey(location: AgentSessionExecutionLocation): string {
-  return [location.executionHostId, location.wslDistro ?? '', location.workspaceId].join(
-    SCOPE_KEY_SEPARATOR
-  )
+  return [location.executionHostId, location.wslDistro ?? '', location.workspaceId].join('\u0000')
 }
 
 export function agentSessionExecutionLocationsEqual(
@@ -221,13 +217,16 @@ export function isAgentSessionProcessIdentity(
   )
 }
 
+const ACCOUNT_HOME_VARIABLES = ['CLAUDE_CONFIG_DIR', 'CODEX_HOME', 'ZCODE_HOME']
+
 function isAgentSessionAccountHome(value: unknown): value is AgentSessionAccountHome {
   if (typeof value !== 'object' || value === null) {
     return false
   }
   const home = value as Partial<AgentSessionAccountHome>
+  // `?? ''` only coerces the absent-field query; no account home variable is ever ''.
   return (
-    (home.variable === 'CLAUDE_CONFIG_DIR' || home.variable === 'CODEX_HOME') &&
+    ACCOUNT_HOME_VARIABLES.includes(home.variable ?? '') &&
     isBoundedString(home.path, MAX_PATH_LENGTH)
   )
 }

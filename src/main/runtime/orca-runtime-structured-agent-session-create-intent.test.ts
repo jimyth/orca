@@ -1,5 +1,48 @@
+import { homedir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
+
+vi.mock('../windows/windows-process-table', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  isWindowsProcessStartTimeAvailable: vi.fn(() => true)
+}))
+
+/** The location/resolve overrides every intent test needs: the intent resolver asks the runtime
+ *  for a location and a workspace path before it can name an account home. */
+function stubLocationResolution(
+  runtime: OrcaRuntimeService,
+  wslDistro: string | null = null
+): void {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: reaches the runtime's own protected location resolver for test override; the override only ever assigns vi.fn doubles with the declared shape.
+  const internal = runtime as unknown as {
+    resolveStructuredAgentSessionLocation: (selector: string) => Promise<{
+      executionHostId: string
+      wslDistro: string | null
+      workspaceId: string
+      workspaceKind: 'git-worktree'
+    }>
+    resolveRuntimeFileTarget: (selector: string) => Promise<{
+      worktree: { path: string }
+    }>
+  }
+  internal.resolveStructuredAgentSessionLocation = vi.fn(async () => ({
+    executionHostId: 'local',
+    wslDistro,
+    workspaceId: 'workspace-1',
+    workspaceKind: 'git-worktree' as const
+  }))
+  internal.resolveRuntimeFileTarget = vi.fn(async () => ({
+    worktree: { path: '/repos/workspace-1' }
+  }))
+}
+
+function runtimeForIntentTest(settings: object): OrcaRuntimeService {
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: OrcaRuntimeService's first parameter is a large collaborator bundle; the intent resolver under test reads only getSettings, which this stub provides in full.
+  return new OrcaRuntimeService({ getSettings: () => settings } as never, undefined, {
+    prepareCodexStructuredLaunch: vi.fn()
+  })
+}
 
 describe('structured agent-session create intent', () => {
   it('pins the selected Codex launch home after normal launch preparation', async () => {
@@ -171,5 +214,67 @@ describe('structured agent-session create intent', () => {
       variable: 'CLAUDE_CONFIG_DIR',
       path: '/accounts/managed/claude-home'
     })
+  })
+})
+
+describe('structured agent-session zcode create', () => {
+  it('resolves a zcode intent against the user zcode home with no adoption', async () => {
+    const runtime = runtimeForIntentTest({ agentDefaultEnv: {} })
+    vi.spyOn(runtime, 'getStructuredAgentSessionCreateSupport').mockResolvedValue({
+      supported: true
+    })
+    stubLocationResolution(runtime)
+
+    const intent = await runtime.resolveStructuredAgentSessionCreateIntent({
+      envelope: { sessionId: 'session-1', clientOperationId: 'operation-1' },
+      worktree: 'id:workspace-1',
+      agent: 'zcode'
+    })
+
+    // Zcode has no managed home: app-server reads the user's real ~/.zcode, and the launch
+    // resolver deliberately never reads this value back — it exists so the durable record and
+    // the wire agree on where the conversation's credentials live.
+    expect(intent.accountHome).toEqual({
+      variable: 'ZCODE_HOME',
+      path: join(homedir(), '.zcode')
+    })
+    expect(intent.provider).toBe('zcode')
+    expect(intent.agent).toBe('zcode')
+    expect(intent.adopt).toBeUndefined()
+  })
+
+  it('refuses a zcode resume rather than adopting through a Codex home', async () => {
+    const runtime = runtimeForIntentTest({ agentDefaultEnv: {} })
+    vi.spyOn(runtime, 'getStructuredAgentSessionCreateSupport').mockResolvedValue({
+      supported: true
+    })
+    stubLocationResolution(runtime)
+
+    await expect(
+      runtime.resolveStructuredAgentSessionCreateIntent({
+        envelope: { sessionId: 'session-1', clientOperationId: 'operation-1' },
+        worktree: 'id:workspace-1',
+        agent: 'zcode',
+        resumeFrom: { providerSessionId: 'provider-session-1' }
+      })
+    ).rejects.toThrow('structured_agent_session_unsupported')
+  })
+
+  it('reports zcode create support on a local non-WSL workspace', async () => {
+    const runtime = runtimeForIntentTest({})
+    stubLocationResolution(runtime)
+
+    await expect(
+      runtime.getStructuredAgentSessionCreateSupport('id:workspace-1', 'zcode')
+    ).resolves.toEqual({ supported: true })
+  })
+
+  it('keeps zcode create support refused for a WSL workspace', async () => {
+    const runtime = runtimeForIntentTest({})
+    stubLocationResolution(runtime, 'Ubuntu')
+
+    await expect(
+      runtime.getStructuredAgentSessionCreateSupport('id:workspace-1', 'zcode')
+    ).resolves.toEqual({ supported: false, reason: 'wsl' })
   })
 })

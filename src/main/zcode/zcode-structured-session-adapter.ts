@@ -17,6 +17,7 @@ import {
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import type { ZcodeAppServerConnection } from './zcode-app-server-connection'
 import { isZcodeAppServerRequestError } from './zcode-app-server-connection'
+import { supportsZcodeStructuredLocation } from './zcode-structured-location-support'
 import {
   acquireZcodeStructuredSession,
   defaultZcodeModelSelection
@@ -55,6 +56,8 @@ export class ZcodeStructuredSessionAdapter implements StructuredAgentSessionAdap
   private readonly acquisitions = new ZcodeAcquisitionRegistry()
 
   constructor(private readonly deps: ZcodeStructuredSessionAdapterDeps) {}
+
+  supportsLocation = supportsZcodeStructuredLocation
 
   acquire = (input: StructuredAgentSessionAcquireInput): Promise<AgentSessionAcquisition> =>
     acquireZcodeStructuredSession({

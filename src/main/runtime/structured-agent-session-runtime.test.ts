@@ -18,9 +18,9 @@ import {
 } from './structured-agent-session-owner-probe'
 import {
   ensureStructuredAgentSessionHost,
-  hasPersistedStructuredAgentSessionStore,
   stopStructuredAgentSessionRuntime
 } from './structured-agent-session-runtime'
+import { hasPersistedStructuredAgentSessionStore } from './agent-session-record-store-file'
 
 const HOST_ID = 'local'
 
@@ -270,6 +270,36 @@ describe('structured agent-session runtime install', () => {
         failure
       )
     )
+  })
+
+  it('answers zcode create support through the registered zcode adapter', async () => {
+    stateDirectory = await mkdtemp(join(tmpdir(), 'orca-structured-runtime-'))
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
+    try {
+      const host = await ensureStructuredAgentSessionHost({
+        stateDirectory,
+        hostId: HOST_ID,
+        claimKeyId: 'key-1',
+        resolveWorkspacePath: async () => stateDirectory!,
+        resolveClaudeAuthPolicy: () => ({ stripAuthEnv: true }),
+        resolveEnvironment: async () => ({})
+      })
+
+      expect(
+        host.supportsCreate(
+          {
+            executionHostId: 'local',
+            wslDistro: null,
+            workspaceId: 'workspace-1',
+            workspaceKind: 'folder'
+          },
+          'zcode'
+        )
+      ).toBe(true)
+    } finally {
+      Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform })
+    }
   })
 
   it('does not infer Windows process identity support from an injected reader', async () => {

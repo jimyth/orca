@@ -29,4 +29,13 @@ describe('TUI_AGENT_CONFIG', () => {
       expect(TUI_AGENT_CONFIG[agent as TuiAgent]).toMatchObject(expected)
     }
   })
+
+  it('injects the zcode prompt over stdin after startup, not as argv', () => {
+    // Unknown positional argv makes the zcode CLI exit with "Unknown command", so the prompt
+    // must ride stdin once the REPL is ready.
+    expect(TUI_AGENT_CONFIG.zcode).toMatchObject({
+      detectCmd: 'zcode',
+      promptInjectionMode: 'stdin-after-start'
+    })
+  })
 })
