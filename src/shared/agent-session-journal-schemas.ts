@@ -34,6 +34,19 @@ const ProviderFrame = z.object({
   payload: BoundedPayload
 })
 
+/** Optional like every other turn field: rows a newer host wrote with buckets
+ *  this build has never heard of must not turn malformed, so unknown keys drop
+ *  (zod strips by default) and the known ones survive. */
+const TurnUsage = z.object({
+  totalTokens: z.number().finite().nonnegative(),
+  inputTokens: z.number().finite().nonnegative().optional(),
+  outputTokens: z.number().finite().nonnegative().optional(),
+  cacheReadTokens: z.number().finite().nonnegative().optional(),
+  cacheWriteTokens: z.number().finite().nonnegative().optional(),
+  reasoningTokens: z.number().finite().nonnegative().optional(),
+  modelRequestCount: z.number().finite().nonnegative().optional()
+})
+
 const ToolMetadata = {
   mcpIdentity: z.object({ server: z.string(), tool: z.string() }).optional(),
   exitCode: z.number().int().optional(),
@@ -216,7 +229,8 @@ export const AgentJournalItemBodySchema = z.discriminatedUnion('kind', [
         startedAt: z.number().finite().positive().optional(),
         requestedAt: z.number().finite().positive().optional(),
         completedAt: z.number().finite().positive().optional(),
-        durationMs: z.number().finite().nonnegative().optional()
+        durationMs: z.number().finite().nonnegative().optional(),
+        usage: TurnUsage.optional()
       })
       .optional(),
     providerFrame: ProviderFrame.optional()
@@ -233,7 +247,8 @@ export const AgentJournalItemBodySchema = z.discriminatedUnion('kind', [
     startedAt: z.number().finite().positive().optional(),
     requestedAt: z.number().finite().positive().optional(),
     completedAt: z.number().finite().positive().optional(),
-    durationMs: z.number().finite().nonnegative().optional()
+    durationMs: z.number().finite().nonnegative().optional(),
+    usage: TurnUsage.optional()
   })
 ])
 

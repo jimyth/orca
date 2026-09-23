@@ -158,6 +158,96 @@ describe('translateZcodeSessionEvent mapping table', () => {
       }
     },
     {
+      name: 'turn.completed carries the provider usage onto the boundary',
+      event: envelope(
+        'turn.completed',
+        {
+          resultType: 'success',
+          duration: 2615,
+          tokenCount: 32104,
+          usage: {
+            source: 'provider',
+            modelRequestCount: 1,
+            inputTokens: 32090,
+            outputTokens: 14,
+            totalTokens: 32104,
+            cacheReadTokens: 2368,
+            cacheWriteTokens: 0,
+            reasoningTokens: 0
+          }
+        },
+        { turnId: 'turn-1' }
+      ),
+      check: (translation) => {
+        expect(translation.turnBoundary?.usage).toEqual({
+          totalTokens: 32104,
+          inputTokens: 32090,
+          outputTokens: 14,
+          cacheReadTokens: 2368,
+          cacheWriteTokens: 0,
+          reasoningTokens: 0,
+          modelRequestCount: 1
+        })
+      }
+    },
+    {
+      name: 'turn.completed falls back to tokenCount when usage omits a total',
+      event: envelope(
+        'turn.completed',
+        { resultType: 'success', duration: 10, tokenCount: 500, usage: { inputTokens: 480 } },
+        { turnId: 'turn-1' }
+      ),
+      check: (translation) => {
+        expect(translation.turnBoundary?.usage).toEqual({ totalTokens: 500, inputTokens: 480 })
+      }
+    },
+    {
+      name: 'turn.completed derives the total from input plus output when absent',
+      event: envelope(
+        'turn.completed',
+        { resultType: 'success', duration: 10, usage: { inputTokens: 70, outputTokens: 30 } },
+        { turnId: 'turn-1' }
+      ),
+      check: (translation) => {
+        expect(translation.turnBoundary?.usage).toEqual({
+          totalTokens: 100,
+          inputTokens: 70,
+          outputTokens: 30
+        })
+      }
+    },
+    {
+      name: 'turn.completed without any token facts omits usage entirely',
+      event: envelope(
+        'turn.completed',
+        { resultType: 'success', duration: 10 },
+        { turnId: 'turn-1' }
+      ),
+      check: (translation) => {
+        expect(translation.turnBoundary?.usage).toBeUndefined()
+      }
+    },
+    {
+      name: 'turn.completed ignores non-finite or negative usage values',
+      event: envelope(
+        'turn.completed',
+        {
+          resultType: 'success',
+          duration: 10,
+          usage: {
+            inputTokens: Number.POSITIVE_INFINITY,
+            outputTokens: 'many',
+            totalTokens: -5,
+            cacheReadTokens: Number.NaN
+          }
+        },
+        { turnId: 'turn-1' }
+      ),
+      check: (translation) => {
+        expect(translation.turnBoundary?.usage).toBeUndefined()
+      }
+    },
+    {
       name: 'turn.failed settles as a failure and surfaces the error frame',
       event: envelope(
         'turn.failed',

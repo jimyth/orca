@@ -5,6 +5,7 @@ import {
   formatNativeChatDuration,
   NATIVE_CHAT_TURN_STATUS_COPY
 } from '../../../../shared/native-chat-turn-status'
+import type { AgentJournalTurnUsage } from '../../../../shared/agent-session-journal-types'
 import { useNativeChatElapsedSeconds } from './use-native-chat-elapsed-seconds'
 
 export { formatNativeChatDuration }
@@ -13,39 +14,51 @@ export function NativeChatWorkingStatus({
   startedAt,
   thinking,
   workedSeconds,
+  usage,
   expanded = false,
   onToggleExpanded
 }: {
   startedAt: number | null
   thinking: boolean
   workedSeconds?: number | null
+  usage?: AgentJournalTurnUsage
   expanded?: boolean
   onToggleExpanded?: () => void
 }): React.JSX.Element {
   const counting = !thinking && workedSeconds == null
   const elapsedSeconds = useNativeChatElapsedSeconds(startedAt, counting)
 
-  const { key, duration } = describeNativeChatTurnStatus({
+  const { key, duration, tokens } = describeNativeChatTurnStatus({
     thinking,
     workedSeconds,
-    elapsedSeconds
+    elapsedSeconds,
+    usage
   })
   const label =
-    key === 'workedFor'
+    key === 'workedForWithTokens'
       ? translate(
-          'components.native-chat.status.workedFor',
-          NATIVE_CHAT_TURN_STATUS_COPY.workedFor,
-          {
-            value0: duration
-          }
+          'components.native-chat.status.workedForWithTokens',
+          NATIVE_CHAT_TURN_STATUS_COPY.workedForWithTokens,
+          { value0: duration, value1: tokens }
         )
-      : key === 'thinking'
-        ? translate('components.native-chat.status.thinking', NATIVE_CHAT_TURN_STATUS_COPY.thinking)
-        : translate(
-            'components.native-chat.status.workingFor',
-            NATIVE_CHAT_TURN_STATUS_COPY.workingFor,
-            { value0: duration }
+      : key === 'workedFor'
+        ? translate(
+            'components.native-chat.status.workedFor',
+            NATIVE_CHAT_TURN_STATUS_COPY.workedFor,
+            {
+              value0: duration
+            }
           )
+        : key === 'thinking'
+          ? translate(
+              'components.native-chat.status.thinking',
+              NATIVE_CHAT_TURN_STATUS_COPY.thinking
+            )
+          : translate(
+              'components.native-chat.status.workingFor',
+              NATIVE_CHAT_TURN_STATUS_COPY.workingFor,
+              { value0: duration }
+            )
   // `tabular-nums`: the live clock reflows its own label every second otherwise.
   const className = `flex min-h-8 items-center gap-1 text-sm text-muted-foreground tabular-nums${thinking ? '' : ' border-b border-border'}`
   const caret =

@@ -5,7 +5,8 @@ import type {
   AgentJournalStatusItem,
   AgentJournalToolCallState,
   AgentJournalTurnLifecycleState,
-  AgentJournalTurnOutcome
+  AgentJournalTurnOutcome,
+  AgentJournalTurnUsage
 } from '../../shared/agent-session-journal-types'
 import { unhandledProviderFrameJournalItem } from '../native-chat/agent-session-wire/unhandled-provider-frame'
 import type { ZcodeSessionEventEnvelope } from './zcode-protocol'
@@ -72,6 +73,8 @@ export type ZcodeJournalTurnBoundary = {
   startedAt?: number
   completedAt?: number
   durationMs?: number
+  /** Provider-reported token usage of the finished turn, when it carried any. */
+  usage?: AgentJournalTurnUsage
 }
 
 export type ZcodeJournalGenericFrame = {
@@ -156,6 +159,46 @@ function translateTurnStart(
   return true
 }
 
+/** Token usage off a `turn.completed` payload. The wire schema leaves `usage`
+ *  open (z.unknown), so every field is screened here; `totalTokens` is derived
+ *  from the sibling `tokenCount` or input+output when the provider omitted it,
+ *  and a payload with no usable token fact at all yields undefined. */
+function zcodeTurnUsageFromPayload(payload: unknown): AgentJournalTurnUsage | undefined {
+  if (!isRecord(payload)) {
+    return undefined
+  }
+  const usage = isRecord(payload.usage) ? payload.usage : undefined
+  const readUsageCount = (key: string): number | undefined => {
+    const value = usage?.[key]
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined
+  }
+  const inputTokens = readUsageCount('inputTokens')
+  const outputTokens = readUsageCount('outputTokens')
+  const payloadTokenCount = readFiniteNumber(payload, 'tokenCount') ?? undefined
+  const totalTokens =
+    readUsageCount('totalTokens') ??
+    payloadTokenCount ??
+    (inputTokens !== undefined || outputTokens !== undefined
+      ? (inputTokens ?? 0) + (outputTokens ?? 0)
+      : undefined)
+  if (totalTokens === undefined) {
+    return undefined
+  }
+  const cacheReadTokens = readUsageCount('cacheReadTokens')
+  const cacheWriteTokens = readUsageCount('cacheWriteTokens')
+  const reasoningTokens = readUsageCount('reasoningTokens')
+  const modelRequestCount = readUsageCount('modelRequestCount')
+  return {
+    totalTokens,
+    ...(inputTokens === undefined ? {} : { inputTokens }),
+    ...(outputTokens === undefined ? {} : { outputTokens }),
+    ...(cacheReadTokens === undefined ? {} : { cacheReadTokens }),
+    ...(cacheWriteTokens === undefined ? {} : { cacheWriteTokens }),
+    ...(reasoningTokens === undefined ? {} : { reasoningTokens }),
+    ...(modelRequestCount === undefined ? {} : { modelRequestCount })
+  }
+}
+
 function translateTurnCompletion(
   envelope: ZcodeSessionEventEnvelope,
   translation: ZcodeJournalTranslation
@@ -166,12 +209,14 @@ function translateTurnCompletion(
   const resultType = readString(envelope.payload, 'resultType')
   const outcome = zcodeTurnOutcome(resultType)
   const durationMs = readFiniteNumber(envelope.payload, 'duration')
+  const usage = zcodeTurnUsageFromPayload(envelope.payload)
   translation.turnBoundary = {
     turnId: envelope.turnId,
     state: outcome === 'cancellation' ? 'interrupted' : 'completed',
     ...(outcome === undefined ? {} : { outcome }),
     completedAt: envelope.timestamp,
-    ...(durationMs === null ? {} : { durationMs })
+    ...(durationMs === null ? {} : { durationMs }),
+    ...(usage === undefined ? {} : { usage })
   }
   return true
 }

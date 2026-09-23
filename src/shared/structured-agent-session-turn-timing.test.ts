@@ -93,6 +93,26 @@ describe('selectStructuredAgentTurnTimings', () => {
     ]
     expect(selectStructuredAgentTurnTimings(items).get('u1')?.completedAt).toBeUndefined()
   })
+
+  it('carries the turn usage through to timings and settled turns', () => {
+    const usage = { totalTokens: 32104, inputTokens: 32090, outputTokens: 14 }
+    const items = [
+      user('u1'),
+      lifecycle('t1', {
+        state: 'completed',
+        startedAt: 10_000,
+        completedAt: 197_500,
+        durationMs: 187_500,
+        usage
+      })
+    ]
+    const timings = selectStructuredAgentTurnTimings(items)
+    expect(timings.get('u1')?.usage).toEqual(usage)
+    expect(selectStructuredAgentSettledTurns(items).get('u1')).toMatchObject({
+      workedSeconds: 187,
+      usage
+    })
+  })
 })
 
 describe('completedStructuredAgentTurnSeconds', () => {

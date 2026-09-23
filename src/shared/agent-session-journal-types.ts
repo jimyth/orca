@@ -191,6 +191,20 @@ export type AgentJournalTurnLifecycleState = (typeof AGENT_JOURNAL_TURN_LIFECYCL
 export const AGENT_JOURNAL_TURN_OUTCOMES = ['success', 'failure', 'cancellation'] as const
 export type AgentJournalTurnOutcome = (typeof AGENT_JOURNAL_TURN_OUTCOMES)[number]
 
+/** Token usage a provider reported for one turn. `totalTokens` is guaranteed by
+ *  the writer (derived from input+output or the turn's tokenCount when the
+ *  provider omitted it); the buckets stay optional so providers that report
+ *  only a subset still fit. Absent usage means the provider said nothing. */
+export type AgentJournalTurnUsage = {
+  totalTokens: number
+  inputTokens?: number
+  outputTokens?: number
+  cacheReadTokens?: number
+  cacheWriteTokens?: number
+  reasoningTokens?: number
+  modelRequestCount?: number
+}
+
 export type AgentJournalTurnLifecycle = {
   turnId: string
   state: AgentJournalTurnLifecycleState
@@ -211,6 +225,9 @@ export type AgentJournalTurnLifecycle = {
   completedAt?: number
   /** The provider's own measured turn duration, preferred over the host interval. */
   durationMs?: number
+  /** Token usage the provider attached to the turn's terminal event, when it
+   *  reported any. Absent on older rows and providers that say nothing. */
+  usage?: AgentJournalTurnUsage
 }
 
 export type AgentJournalStatusItem = {

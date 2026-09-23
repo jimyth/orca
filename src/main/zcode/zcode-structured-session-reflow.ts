@@ -284,7 +284,8 @@ function applyTurnBoundary(
     ...(boundary.startedAt === undefined ? {} : { startedAt: boundary.startedAt }),
     ...(requestedAt === undefined ? {} : { requestedAt }),
     ...(boundary.completedAt === undefined ? {} : { completedAt: boundary.completedAt }),
-    ...(boundary.durationMs === undefined ? {} : { durationMs: boundary.durationMs })
+    ...(boundary.durationMs === undefined ? {} : { durationMs: boundary.durationMs }),
+    ...(boundary.usage === undefined ? {} : { usage: boundary.usage })
   }
   session.items.set(`turn:${boundary.turnId}`, turnBody)
   return append(`turn:${boundary.turnId}`, turnBody, { lifecycle: true })

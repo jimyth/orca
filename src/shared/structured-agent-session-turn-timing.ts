@@ -7,7 +7,8 @@ import { agentJournalSubmissionKey } from './agent-session-journal-item-key'
 import type {
   AgentJournalRenderItem,
   AgentJournalSubmission,
-  AgentJournalTurnLifecycleState
+  AgentJournalTurnLifecycleState,
+  AgentJournalTurnUsage
 } from './agent-session-journal-types'
 import { readAgentJournalTurn } from './agent-session-turn-record'
 import type { NativeChatSettledTurn, NativeChatSettledTurns } from './native-chat-turn-status'
@@ -23,6 +24,8 @@ export type StructuredAgentTurnTiming = {
   completedAt?: number
   /** The provider's own measurement; used when exact host endpoints are unavailable. */
   durationMs?: number
+  /** Provider-reported token usage; absent when the terminal event said nothing. */
+  usage?: AgentJournalTurnUsage
   /** Host clock when the lifecycle row was appended; with `startedAt` it gives
    *  the host-side lag a client must subtract to anchor a live counter. */
   observedAt: number
@@ -33,7 +36,7 @@ function readTiming(item: AgentJournalRenderItem): StructuredAgentTurnTiming | n
   if (!turn) {
     return null
   }
-  const { state, startedAt, requestedAt, completedAt, durationMs } = turn
+  const { state, startedAt, requestedAt, completedAt, durationMs, usage } = turn
   if (startedAt === undefined || !Number.isFinite(startedAt) || startedAt <= 0) {
     return null
   }
@@ -55,6 +58,7 @@ function readTiming(item: AgentJournalRenderItem): StructuredAgentTurnTiming | n
     ...(requested !== undefined ? { requestedAt: requested } : {}),
     ...(end !== undefined ? { completedAt: end } : {}),
     ...(measured !== undefined ? { durationMs: measured } : {}),
+    ...(usage === undefined ? {} : { usage }),
     observedAt: item.observedAt
   }
 }
@@ -177,7 +181,11 @@ export function selectStructuredAgentSettledTurns(
       userItemId,
       workedSeconds === null || timing === null
         ? null
-        : { startedAt: timing.startedAt, workedSeconds }
+        : {
+            startedAt: timing.startedAt,
+            workedSeconds,
+            ...(timing.usage === undefined ? {} : { usage: timing.usage })
+          }
     )
   }
   return settled

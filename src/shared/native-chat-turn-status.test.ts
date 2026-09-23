@@ -35,19 +35,41 @@ describe('describeNativeChatTurnStatus', () => {
   it('prefers the settled duration over the thinking and counting labels', () => {
     expect(
       describeNativeChatTurnStatus({ thinking: true, workedSeconds: 184, elapsedSeconds: 9 })
-    ).toEqual({ key: 'workedFor', duration: '3m 4s' })
+    ).toEqual({ key: 'workedFor', duration: '3m 4s', tokens: null })
   })
 
   it('reports thinking before the turn produces output', () => {
     expect(
       describeNativeChatTurnStatus({ thinking: true, workedSeconds: null, elapsedSeconds: 9 })
-    ).toEqual({ key: 'thinking', duration: null })
+    ).toEqual({ key: 'thinking', duration: null, tokens: null })
   })
 
   it('counts once the turn has output', () => {
     expect(
       describeNativeChatTurnStatus({ thinking: false, workedSeconds: null, elapsedSeconds: 12 })
-    ).toEqual({ key: 'workingFor', duration: '12s' })
+    ).toEqual({ key: 'workingFor', duration: '12s', tokens: null })
+  })
+
+  it('appends the compact token count to a settled turn that recorded usage', () => {
+    expect(
+      describeNativeChatTurnStatus({
+        thinking: false,
+        workedSeconds: 3,
+        elapsedSeconds: 9,
+        usage: { totalTokens: 32104, inputTokens: 32090, outputTokens: 14 }
+      })
+    ).toEqual({ key: 'workedForWithTokens', duration: '3s', tokens: '32k' })
+  })
+
+  it('leaves the settled label unchanged when usage carries no total', () => {
+    expect(
+      describeNativeChatTurnStatus({
+        thinking: false,
+        workedSeconds: 3,
+        elapsedSeconds: 9,
+        usage: undefined
+      })
+    ).toEqual({ key: 'workedFor', duration: '3s', tokens: null })
   })
 })
 
@@ -370,6 +392,26 @@ describe('selectNativeChatTurnStatuses', () => {
       { activeTurnKey: 'u1', isWorking: false, thinking: false }
     )
     expect(completedByTurn.u1).toEqual({ startedAt: 1_000, thinking: false, workedSeconds: 12 })
+    expect(active).toEqual(completedByTurn.u1)
+  })
+
+  it('carries the settled turn usage onto the completed status', () => {
+    const usage = { totalTokens: 32104, inputTokens: 32090, outputTokens: 14 }
+    const { active, completedByTurn } = selectNativeChatTurnStatuses(
+      {},
+      {
+        activeTurnKey: 'u1',
+        isWorking: false,
+        thinking: false,
+        settledByTurn: new Map([['u1', { startedAt: 1_000, workedSeconds: 12, usage }]])
+      }
+    )
+    expect(completedByTurn.u1).toEqual({
+      startedAt: 1_000,
+      thinking: false,
+      workedSeconds: 12,
+      usage
+    })
     expect(active).toEqual(completedByTurn.u1)
   })
 
