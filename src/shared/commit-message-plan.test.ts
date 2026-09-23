@@ -759,4 +759,32 @@ describe('backslash mode reaches every command the user can type (#11375)', () =
 
     expect(plan.ok && plan.plan.args).toContain('/my dir')
   })
+
+  it('plans ZCode one-shot generation with the prompt as the -p value, not stdin', () => {
+    const result = planCommitMessageGeneration(
+      { agentId: 'zcode', model: 'default' },
+      'real commit prompt'
+    )
+
+    expect(result).toEqual({
+      ok: true,
+      plan: {
+        binary: 'zcode',
+        args: ['-p', 'real commit prompt', '--output-format', 'text', '--mode', 'plan'],
+        stdinPayload: null,
+        label: 'ZCode'
+      }
+    })
+  })
+
+  it('lets ZCode recipe args replace the generated mode without repeating it', () => {
+    const result = planCommitMessageGeneration(
+      { agentId: 'zcode', model: 'default', agentArgs: '--mode yolo' },
+      'prompt'
+    )
+
+    expect(result.ok).toBe(true)
+    expect(result.ok && result.plan.args.filter((token) => token === '--mode')).toHaveLength(1)
+    expect(result.ok && result.plan.args).toContain('yolo')
+  })
 })

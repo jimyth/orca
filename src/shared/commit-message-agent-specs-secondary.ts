@@ -227,6 +227,31 @@ export function buildSecondaryCommitMessageAgentSpecs({
       modelDiscovery: { binary: 'agy', args: ['models'], parse: parseAntigravityModels },
       models: [{ id: 'default', label: 'Config default' }],
       defaultModelId: 'default'
+    },
+    zcode: {
+      id: 'zcode',
+      label: 'ZCode',
+      binary: 'zcode',
+      // Why: one-shot mode takes the prompt only as -p/--prompt argv — a `-p`
+      // without a value exits 1, so stdin delivery is not an option here.
+      promptDelivery: 'argv',
+      buildArgs: ({ prompt }) => [
+        '-p',
+        prompt,
+        // Why: text keeps stdout as the plain answer the generator consumes, and
+        // plan keeps the run read-only — the -p default is yolo, which must never
+        // drive commit-message generation.
+        '--output-format',
+        'text',
+        '--mode',
+        'plan'
+      ],
+      singletonOptions: [['-p', '--prompt'], ['--mode'], ['--output-format']],
+      // Why: the -p mode has no --model flag (the CLI rejects it); the configured
+      // provider default is the only honest catalog entry.
+      modelSource: 'static',
+      models: [{ id: 'default', label: 'Config default' }],
+      defaultModelId: 'default'
     }
   }
 }

@@ -40,7 +40,8 @@ describe('COMMIT_MESSAGE_AGENT_SPECS', () => {
       'omp',
       'opencode',
       'opencode2',
-      'pi'
+      'pi',
+      'zcode'
     ])
   })
 
@@ -708,5 +709,30 @@ describe('Pi Source Control AI model selection', () => {
     const modelFlagIndex = args.indexOf('--model')
     expect(modelFlagIndex).toBeGreaterThanOrEqual(0)
     expect(args[modelFlagIndex + 1]).toBe('openai-codex/gpt-5.5')
+  })
+})
+
+describe('ZCode Source Control AI one-shot invocation', () => {
+  it('delivers the prompt as the -p value with a read-only text run', () => {
+    // Why: zcode's one-shot mode requires the prompt as -p/--prompt argv and
+    // defaults to yolo permissions; plan mode keeps generation read-only.
+    const spec = getCommitMessageAgentSpec('zcode')!
+    expect(spec.promptDelivery).toBe('argv')
+    const args = spec.buildArgs({ prompt: 'Write a commit message', model: 'default' })
+    expect(args).toEqual([
+      '-p',
+      'Write a commit message',
+      '--output-format',
+      'text',
+      '--mode',
+      'plan'
+    ])
+  })
+
+  it('offers only the config default model (the -p mode has no --model flag)', () => {
+    const spec = getCommitMessageAgentSpec('zcode')!
+    expect(spec.modelSource).toBe('static')
+    expect(spec.models).toEqual([{ id: 'default', label: 'Config default' }])
+    expect(spec.buildArgs({ prompt: 'PROMPT', model: 'default' })).not.toContain('--model')
   })
 })

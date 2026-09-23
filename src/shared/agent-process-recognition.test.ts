@@ -205,6 +205,25 @@ describe('agent process recognition', () => {
     })
   })
 
+  it('does not recognize ZCode headless one-shot commands as interactive agents', () => {
+    // Why: `zcode -p <text>` is the one-shot mode; without the matcher entry the
+    // status hooks would attach to a process that exits after one response.
+    expect(recognizeAgentProcessFromCommandLine('zcode -p "summarize this diff"')).toBeNull()
+    expect(
+      recognizeAgentProcessFromCommandLine(
+        'zcode --prompt "review this" --output-format stream-json'
+      )
+    ).toBeNull()
+    expect(recognizeAgentProcessFromCommandLine('zcode --resume sess_123')).toEqual({
+      agent: 'zcode',
+      processName: 'zcode'
+    })
+    expect(recognizeAgentProcessFromCommandLine('zcode')).toEqual({
+      agent: 'zcode',
+      processName: 'zcode'
+    })
+  })
+
   it('recognizes Mistral Vibe by its installed executable and legacy alias', () => {
     expect(recognizeAgentProcess('/home/dev/.local/bin/vibe')).toEqual({
       agent: 'mistral-vibe',
