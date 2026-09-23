@@ -224,6 +224,27 @@ describe('ZcodeStructuredSessionAdapter.acquire', () => {
       { id: 'server-1', result: zcodeRuntimePreferencesResponse() }
     ])
   })
+
+  it('answers runtime preferences while session/create is still pending', async () => {
+    // Real zcode sends this server-request DURING session/create; the acquisition
+    // window must not buffer it or the CLI times create out after 15s (-32022).
+    const zcode = fakeZcode({ 'session/create': () => new Promise(() => {}) })
+    const adapter = adapterFor(zcode)
+    void adapter.acquire({ identity: identityFor('session-1'), fence: 7, spawnToken: 'spawn-1' })
+    await vi.waitFor(() => {
+      expect(zcode.connections[0]?.calls.map((call) => call.method)).toContain('session/create')
+    })
+
+    zcode.connections[0].handlers.onServerRequest?.(
+      serverRequest('server-9', ZCODE_SERVER_REQUEST_METHODS.requestRuntimePreferences, {
+        sessionId: PROVIDER_SESSION_ID
+      })
+    )
+
+    expect(zcode.connections[0].replies).toEqual([
+      { id: 'server-9', result: zcodeRuntimePreferencesResponse() }
+    ])
+  })
 })
 
 describe('ZcodeStructuredSessionAdapter.dispatch', () => {

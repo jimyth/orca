@@ -13,6 +13,10 @@ import {
 import type { AgentSessionProcessIdentity } from '../../shared/agent-session-record'
 import { readProcessStartTimeMs } from '../runtime/agent-session-process-identity-probe'
 import { openZcodeAppServerConnection } from './zcode-app-server-connection'
+import {
+  disposeZcodeServerRequest,
+  zcodeRuntimePreferencesResponse
+} from './zcode-server-request-disposition'
 import type { ZcodeProtocolServerRequest, ZcodeSessionSendParams } from './zcode-protocol'
 import { zcodeSessionIdFromCreateResult } from './zcode-protocol'
 import {
@@ -182,13 +186,22 @@ export async function acquireZcodeStructuredSession(input: {
             () => input.handleNotification(sessionId, method, params),
             Buffer.byteLength(JSON.stringify(params ?? null), 'utf8')
           ),
-        onServerRequest: (request) =>
+        onServerRequest: (request) => {
+          // Session-independent mandatory control requests bypass the
+          // pre-publication window: the CLI sends this during session/create and
+          // fails create with -32022 after 15s unanswered — a wait the buffered
+          // path can never win, since the window only flushes after create does.
+          if (disposeZcodeServerRequest(request).kind === 'runtime-preferences') {
+            acquisition.connection?.respond(request.id, zcodeRuntimePreferencesResponse())
+            return
+          }
           input.deliver(
             acquisition,
             sessionId,
             () => input.handleServerRequest(sessionId, request),
             Buffer.byteLength(JSON.stringify(request), 'utf8')
-          ),
+          )
+        },
         onExit: (error) => {
           if (!input.handleExit(sessionId, acquisition.connection, error)) {
             acquisition.prompts.clear()
