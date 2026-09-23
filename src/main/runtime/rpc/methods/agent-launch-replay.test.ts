@@ -269,6 +269,20 @@ describe('a replay answers from the record', () => {
     expect(conflicting.createManagedWorktree).not.toHaveBeenCalled()
     expect(conflicting.createTerminal).not.toHaveBeenCalled()
   })
+
+  // Presentation is not fingerprinted, so the retry replays; the recorded `surface` tells the
+  // caller the first attempt left the tab to it, whatever the retry asked for.
+  it('replays the first attempt surface to a retry that flipped its presentation', async () => {
+    const first = runtimeStub({ settings: {}, startupTerminalSurface: 'background' })
+    const optedOut = { ...createLaunch({ operationId: OPERATION_ID }), presentation: 'background' }
+    await launch(optedOut, first)
+
+    const retry = runtimeStub({ settings: {}, startupTerminalSurface: 'visible' })
+    const replayed = await launch(createLaunch({ operationId: OPERATION_ID }), retry)
+
+    expect(replayed.outcome).toMatchObject({ kind: 'terminal', surface: 'background' })
+    expect(retry.createManagedWorktree).not.toHaveBeenCalled()
+  })
 })
 
 describe('an uncertain launch stays uncertain', () => {
