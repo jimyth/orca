@@ -65,6 +65,7 @@ export type ZcodeStructuredSessionAdapterDeps = {
   }) => void
   openConnection?: typeof openZcodeAppServerConnection
   readProcessStartTime?: (pid: number) => Promise<number | null>
+  isWindowsProcessStartTimeAvailable?: () => boolean
   mintLinkId?: () => string
   mintAcquisitionGeneration?: () => string
   now?: () => number

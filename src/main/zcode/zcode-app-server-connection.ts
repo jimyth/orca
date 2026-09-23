@@ -9,6 +9,7 @@ import { RetryableProcessExitProof } from '../../shared/child-process/retryable-
 import { ZcodeAppServerRequestError } from './zcode-app-server-connection-errors'
 import { createZcodeFrameReader } from './zcode-app-server-frame-reader'
 import { createZcodePendingRequests } from './zcode-app-server-pending-requests'
+import { armZcodeStorageSequenceWatchdog } from './zcode-app-server-storage-watchdog'
 import { createZcodeChildReaper, waitForExitUntil } from './zcode-app-server-teardown'
 import type {
   ZcodeAppServerConnection,
@@ -31,6 +32,7 @@ export {
   ZcodeAppServerTimeoutError,
   isZcodeAppServerRequestError
 } from './zcode-app-server-connection-errors'
+export { STORAGE_SEQUENCE_TOTAL_TIMEOUT_MS } from './zcode-app-server-storage-watchdog'
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 180_000
 const STORAGE_FIRST_FRAME_TIMEOUT_MS = 30_000
@@ -101,6 +103,13 @@ export async function openZcodeAppServerConnection(
     }
   }
 
+  // Total budget over the whole startup/storageState sequence — survives the
+  // first frame on purpose, so a sequence that stalls mid-flight still dies.
+  const storageSequenceWatchdog = armZcodeStorageSequenceWatchdog((detail) => {
+    markTerminal(new Error(`zcode app-server ${detail}`))
+    void reaper.kill()
+  })
+
   function observeExit(): void {
     exitObserved = true
     resolveExit()
@@ -116,6 +125,7 @@ export async function openZcodeAppServerConnection(
    *  observed `exit`/`close` — tells the owner, once. */
   function markTerminal(error: Error): void {
     clearFirstFrameTimer()
+    storageSequenceWatchdog.clear()
     if (terminalError === null) {
       terminalError = error
       if (!gateSettled) {
@@ -163,8 +173,10 @@ export async function openZcodeAppServerConnection(
     if (!isParamsObject(params) || typeof params.phase !== 'string') {
       return
     }
+    storageSequenceWatchdog.observePhase(params.phase)
     if (params.phase === 'ready') {
       requests.resumeTimers()
+      storageSequenceWatchdog.clear()
       if (!gateSettled) {
         gateSettled = true
         openGate()
@@ -292,6 +304,7 @@ export async function openZcodeAppServerConnection(
       return Promise.resolve(true)
     }
     closing = true
+    storageSequenceWatchdog.clear()
     if (!gateSettled) {
       gateSettled = true
       closeGate(new Error('zcode app-server connection closed'))

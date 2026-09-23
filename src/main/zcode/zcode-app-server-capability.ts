@@ -46,4 +46,9 @@ export class ZcodeAppServerCapabilityCache extends CapabilityProbeCache<ZcodeApp
   }
 }
 
+/** Deliberately unwired (FU): codex consumes its cache where a fallback lane
+ *  exists (hook trust grant → legacy TOML lane); the zcode structured session
+ *  is the only lane, so a 30-min pin would turn a retryable launch failure
+ *  into a hard refusal with no consumer to soften it. Wire it into acquire
+ *  once zcode gains a fallback lane or a provider-availability surface. */
 export const zcodeAppServerCapabilityCache = new ZcodeAppServerCapabilityCache()

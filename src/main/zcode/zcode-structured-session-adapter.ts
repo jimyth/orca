@@ -57,7 +57,8 @@ export class ZcodeStructuredSessionAdapter implements StructuredAgentSessionAdap
 
   constructor(private readonly deps: ZcodeStructuredSessionAdapterDeps) {}
 
-  supportsLocation = supportsZcodeStructuredLocation
+  supportsLocation = (location: Parameters<typeof supportsZcodeStructuredLocation>[0]): boolean =>
+    supportsZcodeStructuredLocation(location, this.deps.isWindowsProcessStartTimeAvailable)
 
   acquire = (input: StructuredAgentSessionAcquireInput): Promise<AgentSessionAcquisition> =>
     acquireZcodeStructuredSession({

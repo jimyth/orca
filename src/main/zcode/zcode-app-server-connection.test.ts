@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
 import { describe, expect, it, vi } from 'vitest'
 import {
+  STORAGE_SEQUENCE_TOTAL_TIMEOUT_MS,
   isZcodeAppServerRequestError,
   openZcodeAppServerConnection,
   type ZcodeAppServerConnection,
@@ -375,6 +376,71 @@ describe('openZcodeAppServerConnection', () => {
     const error = await slow
     expect(error.name).toBe('ZcodeAppServerTimeoutError')
     await connection.close()
+  })
+
+  it('kills the connection when the storage sequence stalls in a non-terminal phase', async () => {
+    vi.useFakeTimers()
+    try {
+      const { child, spawnImpl } = stubChild()
+      const connection = await openZcodeAppServerConnection(
+        { command: 'zcode', args: ['app-server'] },
+        {},
+        spawnImpl
+      )
+
+      // The first frame disarms the 30s no-frames timer; the sequence then
+      // stalls (a second zcode instance holding the SQLite lock looks like
+      // this), so only the total budget can end it.
+      child.stdout.write(storageLine('checking', 'a1', 1))
+      const gated = rejection(connection.request('session/create'))
+      await vi.advanceTimersByTimeAsync(STORAGE_SEQUENCE_TOTAL_TIMEOUT_MS + 1)
+
+      const error = await gated
+      expect(error.message).toContain('storage not ready within')
+      expect(error.message).toContain('(last phase: checking)')
+      expect(connection.closed).toBe(true)
+      await vi.waitFor(() => expect(child.kill).toHaveBeenCalled(), { timeout: 5_000 })
+
+      child.emit('exit', 0, null)
+      await expect(connection.close()).resolves.toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps a normally-opened connection usable past the total budget', async () => {
+    vi.useFakeTimers()
+    try {
+      const { child, spawnImpl, written } = stubChild()
+      const connection = await openZcodeAppServerConnection(
+        { command: 'zcode', args: ['app-server'] },
+        {},
+        spawnImpl
+      )
+
+      child.stdout.write(storageLine('checking', 'a1', 1))
+      child.stdout.write(storageLine('ready', 'a1', 2))
+      // Far past the budget: ready must have disarmed the watchdog.
+      await vi.advanceTimersByTimeAsync(STORAGE_SEQUENCE_TOTAL_TIMEOUT_MS * 2)
+
+      const created = connection.request('session/create')
+      await vi.waitFor(() =>
+        expect(written.some((frame) => frame.method === 'session/create')).toBe(true)
+      )
+      const requestFrame = written.find((frame) => frame.method === 'session/create')
+      if (requestFrame === undefined || typeof requestFrame.id !== 'number') {
+        throw new Error('session/create was not written with a numeric id')
+      }
+      child.stdout.write(
+        `${JSON.stringify({ id: requestFrame.id, result: { session: { sessionId: 'sess_1' } } })}\n`
+      )
+      await expect(created).resolves.toEqual({ session: { sessionId: 'sess_1' } })
+
+      child.emit('exit', 0, null)
+      await expect(connection.close()).resolves.toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('fails in-flight requests and reports an unexpected exit once', async () => {

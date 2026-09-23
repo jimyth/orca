@@ -45,6 +45,14 @@ export type ZcodeJournalAdmission = { accepted: true } | { accepted: false; reas
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null
 
+/** Journal-append helper threaded through every translation arm; false means
+ *  the row was refused and the child is being force-closed. */
+type ZcodeJournalAppend = (
+  itemKey: string,
+  body: AgentJournalItemBody,
+  options: StructuredAgentSessionAppendOptions
+) => boolean
+
 export function appendZcodeJournalRow(
   session: ZcodeSession,
   identity: AgentJournalItemIdentity,
@@ -137,11 +145,7 @@ function applyZcodeTranslation(
   translation: ZcodeJournalTranslation,
   wiring: ZcodeReflowWiring
 ): boolean {
-  const append = (
-    itemKey: string,
-    body: AgentJournalItemBody,
-    options: StructuredAgentSessionAppendOptions
-  ): boolean => {
+  const append: ZcodeJournalAppend = (itemKey, body, options) => {
     const admission = appendZcodeJournalRow(
       session,
       zcodeItemIdentity(session.providerSessionId, itemKey),
@@ -208,10 +212,14 @@ function applyZcodeTranslation(
     }
   }
   if (translation.promptResolution) {
-    applyPromptResolution(session, translation.promptResolution, append)
+    if (!applyPromptResolution(session, translation.promptResolution, append)) {
+      return false
+    }
   }
   if (translation.turnBoundary) {
-    applyTurnBoundary(session, sessionId, translation.turnBoundary, wiring, append)
+    if (!applyTurnBoundary(session, sessionId, translation.turnBoundary, wiring, append)) {
+      return false
+    }
   }
   session.sink?.publish()
   return true
@@ -220,11 +228,7 @@ function applyZcodeTranslation(
 function applyStreamDelta(
   session: ZcodeSession,
   delta: ZcodeJournalTranslation['streamDeltas'][number],
-  append: (
-    itemKey: string,
-    body: AgentJournalItemBody,
-    options: StructuredAgentSessionAppendOptions
-  ) => boolean
+  append: ZcodeJournalAppend
 ): boolean {
   const prior = session.streams.get(delta.streamId)
   const text = `${prior?.text ?? ''}${delta.delta}`
@@ -265,12 +269,8 @@ function applyStreamDelta(
 function applyPromptResolution(
   session: ZcodeSession,
   resolution: NonNullable<ZcodeJournalTranslation['promptResolution']>,
-  append: (
-    itemKey: string,
-    body: AgentJournalItemBody,
-    options: StructuredAgentSessionAppendOptions
-  ) => boolean
-): void {
+  append: ZcodeJournalAppend
+): boolean {
   const { promptKey, resolution: settled } = resolution
   // The server settled it — here or on another device — so the callback is
   // dead: a late host answer must find nothing left to claim.
@@ -280,11 +280,11 @@ function applyPromptResolution(
   }
   const remembered = session.items.get(promptKey)
   if (remembered?.kind !== 'approval' && remembered?.kind !== 'question') {
-    return
+    return true
   }
   const body = { ...remembered, resolution: settled }
   session.items.set(promptKey, body)
-  append(promptKey, body, { lifecycle: true })
+  return append(promptKey, body, { lifecycle: true })
 }
 
 function applyTurnBoundary(
@@ -292,12 +292,8 @@ function applyTurnBoundary(
   sessionId: string,
   boundary: NonNullable<ZcodeJournalTranslation['turnBoundary']>,
   wiring: ZcodeReflowWiring,
-  append: (
-    itemKey: string,
-    body: AgentJournalItemBody,
-    options: StructuredAgentSessionAppendOptions
-  ) => boolean
-): void {
+  append: ZcodeJournalAppend
+): boolean {
   const userItemKey = boundary.userMessageId ?? boundary.inputId ?? null
   const identity =
     userItemKey === null ? null : zcodeItemIdentity(session.providerSessionId, userItemKey)
@@ -329,5 +325,5 @@ function applyTurnBoundary(
     ...(boundary.durationMs === undefined ? {} : { durationMs: boundary.durationMs })
   }
   session.items.set(`turn:${boundary.turnId}`, turnBody)
-  append(`turn:${boundary.turnId}`, turnBody, { lifecycle: true })
+  return append(`turn:${boundary.turnId}`, turnBody, { lifecycle: true })
 }
