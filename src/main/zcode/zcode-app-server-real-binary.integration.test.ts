@@ -12,7 +12,8 @@
 // host-mode `provider/updateAccountConfig` push this stdio client never sends,
 // so beforeAll temporarily installs an api-key rule for the `bigmodel-api`
 // template (key read from ~/.zcode/cli/config.json, the same key the CLI uses)
-// and afterAll restores the original file byte-for-byte. Do not run anything
+// and afterAll restores the original file byte-for-byte (refusing to start if
+// a leftover backup from a crashed run is still in place). Do not run anything
 // else that reads the personal provider file while this suite runs.
 
 import { copyFileSync, existsSync, readFileSync } from 'node:fs'
@@ -40,6 +41,7 @@ import {
 
 const zcodeBin = process.env.ZCODE_BIN ?? ''
 const personalProviderConfigPath = join(homedir(), '.zcode', 'v2', 'provider_config.json')
+const providerBackupPath = `${personalProviderConfigPath}.orca-contract-bak`
 const cliConfigPath = join(homedir(), '.zcode', 'cli', 'config.json')
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -113,6 +115,7 @@ describe.skipIf(!suiteRunnable)('zcode app-server (real binary)', () => {
     storagePhases: string[]
     eventTypes: string[]
     serverRequestMethods: string[]
+    providerBackupCreated: boolean
   } = {
     spawnAtMs: 0,
     readyAfterMs: null,
@@ -121,7 +124,8 @@ describe.skipIf(!suiteRunnable)('zcode app-server (real binary)', () => {
     modelSelection: null,
     storagePhases: [],
     eventTypes: [],
-    serverRequestMethods: []
+    serverRequestMethods: [],
+    providerBackupCreated: false
   }
   let signalStorageReady: () => void = () => {}
   const storageReady = new Promise<void>((resolve) => {
@@ -142,10 +146,21 @@ describe.skipIf(!suiteRunnable)('zcode app-server (real binary)', () => {
   }
 
   beforeAll(async () => {
+    // Guards two paths that would otherwise destroy the user's config:
+    // (1) a SIGKILLed run left the backup behind, so the personal file on disk
+    // is the injected provider — copying it over the backup would erase the
+    // only surviving original; (2) a concurrent second runner racing the same
+    // backup. Both stop here instead.
+    if (existsSync(providerBackupPath)) {
+      throw new Error(
+        `${providerBackupPath} already exists: it holds the user's original provider config saved by a run that crashed before restoring it. Restore it with \`mv ${providerBackupPath} ${personalProviderConfigPath}\`, then re-run.`
+      )
+    }
     harness.workspacePath = await mkdtemp(join(tmpdir(), 'orca-zcode-contract-'))
     // Spike-equivalent personal provider: the template carries baseUrl and the
     // GLM model list; the personal rule only pins the key.
-    copyFileSync(personalProviderConfigPath, `${personalProviderConfigPath}.orca-contract-bak`)
+    copyFileSync(personalProviderConfigPath, providerBackupPath)
+    harness.providerBackupCreated = true
     await writeFile(
       personalProviderConfigPath,
       `${JSON.stringify(
@@ -223,13 +238,13 @@ describe.skipIf(!suiteRunnable)('zcode app-server (real binary)', () => {
 
   afterAll(async () => {
     await harness.connection?.close().catch(() => false)
-    if (existsSync(`${personalProviderConfigPath}.orca-contract-bak`)) {
+    // Restore only the backup this run created: when beforeAll refused over a
+    // stale one, that file belongs to the crashed run and must survive us.
+    if (harness.providerBackupCreated && existsSync(providerBackupPath)) {
       // Restore before the temp workspace goes: an app-server polling the
       // personal file must not observe the test provider past this suite.
-      copyFileSync(`${personalProviderConfigPath}.orca-contract-bak`, personalProviderConfigPath)
-      await rm(`${personalProviderConfigPath}.orca-contract-bak`, { force: true }).catch(
-        () => undefined
-      )
+      copyFileSync(providerBackupPath, personalProviderConfigPath)
+      await rm(providerBackupPath, { force: true }).catch(() => undefined)
     }
     if (harness.workspacePath !== undefined) {
       await rm(harness.workspacePath, { recursive: true, force: true }).catch(() => undefined)
@@ -277,10 +292,12 @@ describe.skipIf(!suiteRunnable)('zcode app-server (real binary)', () => {
 
   it(
     'streams session/event through turn.completed for a send',
-    async () => {
+    async ({ skip }) => {
       const sessionId = harness.providerSessionId
       if (sessionId === null) {
-        throw new Error('session/create case did not run first')
+        // Cascade as skip: the session/create case already failed on its own.
+        skip()
+        return
       }
       await server().request(
         'session/subscribe',
