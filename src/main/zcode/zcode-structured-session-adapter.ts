@@ -229,6 +229,20 @@ export class ZcodeStructuredSessionAdapter implements StructuredAgentSessionAdap
     this.sessions.get(sessionId)?.promptItemIds.set(journalItemId, promptKey)
   }
 
+  /** Launch settlement asks every structured session for its options; with no
+   * option catalog yet (follow-up FU3) report the live model selection only,
+   * resolved through the same chain dispatch uses. */
+  readOptions: StructuredAgentSessionAdapter['readOptions'] = async (input) => {
+    const session = this.sessions.get(input.sessionId)
+    const selection = this.deps.resolveModelSelection
+      ? await this.deps.resolveModelSelection({ sessionId: input.sessionId })
+      : (session?.modelSelection ?? defaultZcodeModelSelection())
+    return {
+      models: [],
+      current: { model: `${selection.providerId}/${selection.modelId}` }
+    }
+  }
+
   async setOption(
     input: StructuredAgentSessionSetOptionInput
   ): Promise<void | Readonly<Record<string, string>>> {
