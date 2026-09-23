@@ -21,6 +21,7 @@ import {
 } from './zcode-protocol'
 import type { ZcodeJournalTranslation } from './zcode-structured-journal-translation'
 import { translateZcodeSessionEvent } from './zcode-structured-journal-translation'
+import { applyZcodeStreamDeltas } from './zcode-structured-session-stream-deltas'
 import {
   zcodeItemIdentity,
   type ZcodeSession,
@@ -201,10 +202,12 @@ function applyZcodeTranslation(
       return false
     }
   }
-  for (const delta of translation.streamDeltas) {
-    if (!applyStreamDelta(session, delta, append)) {
-      return false
-    }
+  if (
+    !applyZcodeStreamDeltas(session, translation.streamDeltas, (itemKey, body, observedAt) =>
+      append(itemKey, body, { observedAt })
+    )
+  ) {
+    return false
   }
   for (const frame of translation.genericFrames) {
     if (!append(frame.itemKey, frame.body, { observedAt: frame.observedAt })) {
@@ -223,47 +226,6 @@ function applyZcodeTranslation(
   }
   session.sink?.publish()
   return true
-}
-
-function applyStreamDelta(
-  session: ZcodeSession,
-  delta: ZcodeJournalTranslation['streamDeltas'][number],
-  append: ZcodeJournalAppend
-): boolean {
-  const prior = session.streams.get(delta.streamId)
-  const text = `${prior?.text ?? ''}${delta.delta}`
-  session.streams.set(delta.streamId, {
-    kind: delta.kind,
-    text,
-    toolName: delta.toolName ?? prior?.toolName ?? null
-  })
-  if (delta.kind === 'tool-input') {
-    // The assembled `tool_call` append later replaces this partial with the
-    // provider's own parsed input; until then the raw stream is the best body.
-    const remembered = session.items.get(delta.streamId)
-    const base: AgentJournalToolCallItem =
-      remembered?.kind === 'tool-call'
-        ? remembered
-        : {
-            kind: 'tool-call',
-            name: delta.toolName ?? prior?.toolName ?? delta.streamId,
-            callId: delta.streamId,
-            input: undefined,
-            state: 'running'
-          }
-    const merged: AgentJournalToolCallItem = { ...base, input: text }
-    session.items.set(delta.streamId, merged)
-    return append(delta.streamId, merged, { observedAt: delta.observedAt })
-  }
-  return append(
-    `stream:${delta.streamId}`,
-    {
-      kind: 'message',
-      role: delta.kind === 'text' ? 'assistant' : 'reasoning',
-      blocks: [{ type: 'text', text }]
-    },
-    { observedAt: delta.observedAt }
-  )
 }
 
 function applyPromptResolution(
