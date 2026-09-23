@@ -84,7 +84,8 @@ export type StructuredAgentSessionRuntimeDeps = {
   /** The same setting for Codex, as app-server thread policy. */
   resolveCodexPermissionPolicy?: () => CodexStructuredPermissionPolicy
   /** The same setting for Zcode; see StructuredZcodeRuntimeAdapterDeps for the modelSelection
-   *  injection point, which stays unset until its source is confirmed against a real binary. */
+   *  injection point — confirmed against a real binary (2026-09-23): the create-result echo is
+   *  the primary source, no settings-backed source exists yet (model catalog is a follow-up). */
   resolveZcodePermissionMode?: StructuredZcodeRuntimeAdapterDeps['resolveZcodePermissionMode']
   resolveZcodeModelSelection?: StructuredZcodeRuntimeAdapterDeps['resolveZcodeModelSelection']
   /** Raw settings getter; the reader that fails closed around it is built here, in checked code. */

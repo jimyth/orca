@@ -27,19 +27,19 @@ import {
 const START_TIME_READ_ATTEMPTS = 3
 const SESSION_SUBSCRIBE_DELIVERY_KIND = 'desktop-continuous'
 
-/** Last-resort model selection matching the shipped zcode config default
- * (provider.builtin:bigmodel + model.main GLM-5.3, reasoning max); a real
- * session prefers the create-result echo or the injected resolver.
- *
- * UNVERIFIED SOURCE: the provider id `builtin:bigmodel` was read from this
- * machine's legacy ~/.zcode config, not confirmed against a clean install —
- * the local spike ran `bigmodel-spike`. The runtime's injectable
- * resolveModelSelection is the correction path; the real-binary tests must
- * empirically confirm (or replace) this constant before it can be trusted
- * cross-environment. */
+/** Last-resort model selection for a session whose create result carried no
+ * model echo; a real session prefers the create-result echo or the injected
+ * resolver, both of which name a provider the app-server registry actually
+ * holds. Empirically confirmed 2026-09-23 against a real app-server
+ * (zcode-app-server-real-binary.integration.test.ts): the registry's provider
+ * id is the builtin template id `bigmodel-api` (GLM-5.3 / GLM-5.3-Flash,
+ * default reasoning level max) — and only when the user configured that
+ * template's key, in ~/.zcode/v2/provider_config.json or via the OAuth
+ * account push. With no provider configured the registry is empty and every
+ * selection fails with provider_not_found; no constant can fix that. */
 export function defaultZcodeModelSelection(): ZcodeSessionSendParams['modelSelection'] {
   return {
-    providerId: 'builtin:bigmodel',
+    providerId: 'bigmodel-api',
     modelId: 'GLM-5.3',
     options: { reasoningLevel: 'max' }
   }

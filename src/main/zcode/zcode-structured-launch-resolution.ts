@@ -62,7 +62,10 @@ export function createZcodeStructuredLaunchResolver(
     }
     // record.accountHome is deliberately not read: zcode has no managed home to pin —
     // app-server reads the user's real ~/.zcode, which is also where a Default
-    // permission mode resolves from.
+    // permission mode resolves from. (ZCODE_HOME would not redirect it anyway: the
+    // services-layer data root is driven by ZCODE_DATA_BASE_DIR — a parent-directory
+    // semantic, {dataBaseDir}/.zcode/v2 — while ZCODE_HOME is only read directly as
+    // the data root by subsystems like computer-use and telemetry.)
     const environment = await deps.resolveEnvironment?.()
     const pathEnv = environment?.PATH ?? environment?.Path ?? null
     const homePath = environment?.HOME ?? environment?.USERPROFILE

@@ -28,9 +28,9 @@ export type StructuredZcodeRuntimeAdapterDeps = {
   /** The user's Agent Permissions setting as the session/create permission mode. */
   resolveZcodePermissionMode?: () => ZcodeStructuredPermissionMode
   /** Zcode session/send model selection from the user's environment. Absent means the
-   *  adapter prefers the create-result echo and falls back to its shipped default; the
-   *  settings-backed source that lands here is deliberately injectable so the real config
-   *  reader can be wired once its shape is confirmed against a real binary. */
+   *  adapter prefers the create-result echo (empirically the reliable path on a real
+   *  app-server) and falls back to its shipped default; a settings-backed source lands
+   *  here once the model-selection catalog exists (follow-up FU3). */
   resolveZcodeModelSelection?: () =>
     | Promise<ZcodeSessionSendParams['modelSelection']>
     | ZcodeSessionSendParams['modelSelection']
