@@ -65,8 +65,7 @@ export function agentLaunchSurfaceFactory(
         worktree: `id:${worktreeId}`,
         agent,
         ...(seeded ? { options: seeded } : {}),
-        // The user asked for this chat, so it takes the surface — unless the caller said it
-        // presents the surface itself, in which case stealing focus is the thing it opted out of.
+        // The user asked for this chat, so it takes the surface unless the caller presents it.
         activate: presentation !== 'background'
       })
       if (!created.ok) {
@@ -109,8 +108,6 @@ export function agentLaunchSurfaceFactory(
         ...(startupPrompt ? { startupPrompt } : {}),
         ...(agentArgs !== undefined ? { agentArgs } : {}),
         ...(cwd ? { cwd } : {}),
-        // Absent leaves `resolveTerminalPresentation` at `undefined`, which is the reveal this
-        // method has always driven; `background` hands the tab to the caller that asked for it.
         ...(presentation ? { presentation } : {}),
         ...agentLaunchTelemetry(agent, launchSource)
       })

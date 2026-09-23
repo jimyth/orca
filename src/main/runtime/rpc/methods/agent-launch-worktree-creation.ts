@@ -79,8 +79,7 @@ export function agentLaunchWorkspaceFactory(
           ...(agentArgs !== undefined ? { startupAgentArgs: agentArgs } : {}),
           ...(cwd ? { startupCwd: cwd } : {}),
           ...(launchSource ? { startupLaunchSource: launchSource } : {}),
-          // A sibling of the create payload rather than a field inside it: suppressing this
-          // launch's reveal must not become something a `worktree.create` caller can ask for.
+          // Beside, not inside, the create payload so `worktree.create` callers cannot send it.
           ...(presentation ? { startupPresentation: presentation } : {}),
           // The launch owns the agent whichever surface it settles on, so the workspace records
           // it even when no startup terminal was created for it.

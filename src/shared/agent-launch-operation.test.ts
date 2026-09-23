@@ -74,9 +74,6 @@ describe('fields the launch fingerprint deliberately ignores', () => {
   })
 
   it('ignores presentation entirely, so a surface-owning caller replays rather than conflicts', () => {
-    // The agent that ends up running is identical; only which side reveals its tab differs. A
-    // replay hands back the recorded result without building any surface, so there is no second
-    // reveal for this field to have governed — folding it in would refuse an honest retry.
     expect(fingerprintOfWirePayload({ ...BASE, presentation: 'background' })).toBe(
       computeAgentLaunchFingerprint(BASE)
     )

@@ -1,16 +1,6 @@
 /**
- * Who presents the surface `agent.launch` creates.
- *
- * The method has always driven a reveal nobody asked it for: it passes no `presentation`, so
- * `resolveTerminalPresentation` answers `undefined`, the gate at orca-runtime-create-terminal.ts:256
- * reads `undefined !== 'background'` as true, and the renderer's bridge mints a tab. A caller that
- * draws its own tab from the `paneKey` the outcome reports would get a second one.
- *
- * So the tests that matter here come in pairs: the opt-out reaches the runtime, AND the launch that
- * sends nothing asks for exactly what it asked for before. The second half is the load-bearing one
- * — mobile, orchestration and the CLI all send nothing, and an older client cannot send anything.
- *
- * `presentation` is not placement. Nothing below asks for a group, an order or a focus target.
+ * Who presents the surface `agent.launch` creates. Tests come in pairs: the opt-out reaches the
+ * runtime, and a launch that sends nothing asks for exactly what it did before.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -82,15 +72,12 @@ describe('a launch into an existing workspace', () => {
 
     await launch(EXISTING_LAUNCH, runtime)
 
-    // Absent, not `undefined` under a present key: `resolveTerminalPresentation` reads the key's
-    // value, but an explicit `presentation: undefined` would also reach the reveal payload's
-    // `...(presentation ? ... : {})` spread differently from how today's callers reach it.
+    // Absent, not `undefined` under a present key: today's options object, unchanged.
     expect(terminalOptions(runtime)).not.toHaveProperty('presentation')
   })
 
   it('refuses a focused presentation at the wire rather than routing it', async () => {
-    // `focused` would send the create down the renderer-backed path, which reports no `paneKey`
-    // and fires no `agent_started`. The schema is the whole guard — there is no clamp behind it.
+    // `focused` would take the renderer-backed path: no `paneKey`, no `agent_started`.
     const runtime = runtimeStub({ settings: TERMINAL_ONLY })
 
     await expect(launch({ ...EXISTING_LAUNCH, presentation: 'focused' }, runtime)).rejects.toThrow()
@@ -98,8 +85,6 @@ describe('a launch into an existing workspace', () => {
   })
 
   it('keeps the opt-out through a downgrade from structured to terminal', async () => {
-    // The downgrade builds its terminal through the same factory. A caller that already drew its
-    // tab does not stop owning it because the host could not give it a chat.
     const runtime = runtimeStub({ createSupport: { supported: false, reason: 'wsl' } })
 
     const result = await launch({ ...EXISTING_LAUNCH, presentation: 'background' }, runtime)
@@ -109,8 +94,6 @@ describe('a launch into an existing workspace', () => {
   })
 
   it('still reports the pane the caller needs in order to present it', async () => {
-    // The opt-out is only usable together with the identity #22108 added: suppressing the reveal
-    // without naming the pane would leave a client with nothing to draw.
     const PANE_KEY = '9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d:3f2504e0-4f89-41d3-9a0c-0305e82c3301'
     const runtime = runtimeStub({ settings: TERMINAL_ONLY, terminalPaneKey: PANE_KEY })
 
@@ -122,8 +105,6 @@ describe('a launch into an existing workspace', () => {
 
 describe('a launch that creates its workspace', () => {
   it('carries the opt-out to the startup terminal the create spawns', async () => {
-    // The other terminal this method can create. Honouring the field on one path and not the other
-    // would make it mean two different things depending on the target.
     const runtime = runtimeStub({ settings: TERMINAL_ONLY })
 
     await launch({ ...CREATE_LAUNCH, presentation: 'background' }, runtime)
@@ -144,8 +125,6 @@ describe('a launch that creates its workspace', () => {
   })
 
   it('names the sibling startupPresentation, not a bare presentation, on the runtime args', async () => {
-    // Only the NAME of the create-args field; that the wire cannot smuggle one into `create` is
-    // pinned at the schema itself, in agent-launch-params.test.ts.
     const runtime = runtimeStub({ settings: TERMINAL_ONLY })
 
     await launch({ ...CREATE_LAUNCH, presentation: 'background' }, runtime)
@@ -156,11 +135,7 @@ describe('a launch that creates its workspace', () => {
 })
 
 describe('a launch the host routes to a chat instead', () => {
-  // Which route a launch takes is the host's decision and the caller cannot predict it. The opt-out
-  // lands differently here — the chat tab is published either way and only its activation is
-  // skipped — but a caller that said it presents the surface must not have one pulled in front of
-  // it either. The factory is mocked below, so these two pin what the launch ASKS for, not what
-  // `structured-agent-session-create` then does with it; that publish is pinned in its own tests.
+  // The structured create is mocked, so these pin what the launch asks for, not the publish.
   it('hands the structured create `activate: false` when the caller presents its own surface', async () => {
     const runtime = runtimeStub()
 

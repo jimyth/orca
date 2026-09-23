@@ -23,8 +23,7 @@ describe('agent.launch params', () => {
   })
 
   it('strips a presentation smuggled into the create payload', () => {
-    // The opt-out is a sibling of `create`, never a field inside it: it must not become something a
-    // `worktree.create` caller can ask for. Asserted at the schema, which is what enforces it.
+    // A sibling of `create`, so `worktree.create` callers cannot ask for it.
     const create = { repo: 'id:repo-1', name: 'task', presentation: 'background' }
     const parsed = AgentLaunch.parse({ ...BASE, target: { kind: 'create-worktree', create } })
     if (parsed.target.kind !== 'create-worktree') {
@@ -54,15 +53,11 @@ describe('agent.launch params', () => {
   })
 
   it('refuses `focused`, which the sibling methods take and this one cannot honour', () => {
-    // Not a vocabulary oversight. `focused` routes the create through the renderer-backed path,
-    // which reports no `paneKey` and fires no `agent_started`; the schema is the only guard,
-    // because unlike its siblings this method has no authority clamp behind it.
     expect(AgentLaunch.safeParse({ ...BASE, presentation: 'focused' }).success).toBe(false)
   })
 
   it('leaves presentation absent rather than defaulting it', () => {
-    // Absent is the whole compatibility argument: it must not read as `background`, or every
-    // shipped caller would silently lose the reveal it relies on.
+    // Absent must not read as `background`: every shipped caller relies on the reveal.
     expect(AgentLaunch.parse(BASE)).not.toHaveProperty('presentation')
   })
 
@@ -79,9 +74,6 @@ describe('agent.launch params', () => {
   })
 })
 
-// Why: an older host strips the unknown key and reveals anyway, and its reply is otherwise
-// identical — same `paneKey`, same handle. A caller that presents its own tab must read this
-// before sending the opt-out, or it draws a second tab beside the one the host revealed.
 describe('the opt-out a caller has to negotiate first', () => {
   it('uses the id a caller codes against', () => {
     expect(AGENT_LAUNCH_PRESENTATION_RUNTIME_CAPABILITY).toBe('agent.launch.presentation.v1')

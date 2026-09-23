@@ -49,9 +49,7 @@ export type AgentLaunchTarget =
  *  terminal agent: a running PTY keeps its execution transport. */
 export type AgentLaunchReusedTerminal = { handle: string }
 
-/** The one presentation this funnel can honour. `Extract` rather than a fresh literal so a rename
- *  of the runtime vocabulary breaks here instead of drifting; see the `AgentLaunch` schema for why
- *  `focused` is not admitted. */
+/** The one presentation this funnel can honour; see the `AgentLaunch` schema for why. */
 export type AgentLaunchPresentation = Extract<RuntimeTerminalPresentation, 'background'>
 
 export type AgentLaunchIntent = {
@@ -89,17 +87,8 @@ export type AgentLaunchIntent = {
    * it cannot know.
    */
   launchSource?: string
-  /**
-   * Who presents the surface this launch creates — the caller, or the host as it does today.
-   * `background` means the caller owns it, so the host skips its reveal and the structured route
-   * creates its chat without activating it; absent keeps the host's reveal.
-   *
-   * Presentation, never placement: it says who reveals, and nothing about which group, which
-   * anchor, or what order. Placement never leaves the client that draws tabs.
-   *
-   * Deliberately NOT a route input, and deliberately not part of the launch's fingerprint — the
-   * agent that ends up running is the same either way.
-   */
+  /** `background` when the caller presents the surface: no terminal reveal, no chat activation.
+   *  Not a route input and not fingerprinted — the same agent runs either way. */
   presentation?: AgentLaunchPresentation
 }
 

@@ -65,9 +65,8 @@ export type AgentLaunchSurfaceFactory = {
     worktreeId: string
     agent: 'claude' | 'codex'
     options?: Readonly<Record<string, unknown>>
-    /** `background` means the caller presents this chat: the tab is still published and only its
-     *  activation is skipped. Deliberately asymmetric with the terminal branch, which publishes no
-     *  tab at all — a chat has no `paneKey` for the caller to draw from, so it must exist here. */
+    /** `background` publishes the chat tab without activating it; unlike a terminal, a chat has
+     *  no `paneKey` for the caller to draw from. */
     presentation?: AgentLaunchPresentation
   }): Promise<AgentLaunchStructuredSurface>
   createTerminalAgent(args: {
@@ -82,8 +81,7 @@ export type AgentLaunchSurfaceFactory = {
     cwd?: string
     /** The one member of the `agent_started` triple the host cannot derive for itself. */
     launchSource?: string
-    /** `background` when the caller draws this terminal's tab itself, so the runtime creates the
-     *  agent without revealing it. Absent leaves the runtime's own reveal in place. */
+    /** `background` when the caller draws this terminal's tab itself; absent keeps the host reveal. */
     presentation?: AgentLaunchPresentation
     /** `paneKey` names the pane this create minted, for a caller that presents its own tabs; a
      *  factory whose runtime does not report one omits it rather than inventing a key. */
@@ -314,8 +312,7 @@ async function resolveWorkspace(
           ...(intent.agentArgs !== undefined ? { agentArgs: intent.agentArgs } : {}),
           ...(intent.cwd ? { cwd: intent.cwd } : {}),
           ...(intent.launchSource ? { launchSource: intent.launchSource } : {}),
-          // Beside the other startup-terminal inputs on purpose: the startup terminal is the only
-          // surface this create reveals, and a structured create has none to suppress.
+          // A structured create has no startup terminal to suppress.
           ...(intent.presentation ? { presentation: intent.presentation } : {})
         })
   })
@@ -347,7 +344,7 @@ async function createSurface(
       worktreeId,
       agent: intent.agent,
       ...(intent.sessionOptions ? { options: intent.sessionOptions } : {}),
-      // The caller cannot predict which route it lands on, so the opt-out has to reach this one too.
+      // The caller cannot predict which route it lands on.
       ...(intent.presentation ? { presentation: intent.presentation } : {})
     })
     return {

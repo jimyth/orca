@@ -1,10 +1,4 @@
-/**
- * The startup terminal a folder workspace's create spawns.
- *
- * Folder workspaces take their own create path, so the `startupPresentation` forward here is a
- * separate line from the git-worktree one — and a caller that opted out of the host's reveal gets
- * a second tab on whichever of the two stops carrying it.
- */
+/** The startup terminal a folder workspace's create spawns; this path forwards presentation itself. */
 
 import { describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../shared/repo-types'

@@ -56,10 +56,7 @@ export type RuntimeManagedWorktreeCreateArgs = {
   startupAgentArgs?: string | null
   startupCwd?: string
   startupLaunchSource?: string
-  /** `background` when the caller draws the startup terminal's tab itself. Absent keeps the
-   *  reveal every existing create path relies on. Narrowed to the launch wire's one arm rather
-   *  than the runtime's two: `focused` re-routes `createTerminal` onto the renderer-backed path,
-   *  which reports no `paneKey` and forwards no telemetry, and every forward below is verbatim. */
+  /** `background` when the caller draws the startup terminal's tab itself; absent keeps the reveal. */
   startupPresentation?: AgentLaunchPresentation
   pendingFirstAgentMessageRename?: boolean
   automationProvenance?: AutomationWorkspaceProvenance
