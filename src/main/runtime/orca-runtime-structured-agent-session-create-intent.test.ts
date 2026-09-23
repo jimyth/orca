@@ -243,21 +243,51 @@ describe('structured agent-session zcode create', () => {
     expect(intent.adopt).toBeUndefined()
   })
 
-  it('refuses a zcode resume rather than adopting through a Codex home', async () => {
+  it('seeds a zcode resume with the opaque handle and no transcript adoption', async () => {
     const runtime = runtimeForIntentTest({ agentDefaultEnv: {} })
     vi.spyOn(runtime, 'getStructuredAgentSessionCreateSupport').mockResolvedValue({
       supported: true
     })
     stubLocationResolution(runtime)
 
-    await expect(
-      runtime.resolveStructuredAgentSessionCreateIntent({
-        envelope: { sessionId: 'session-1', clientOperationId: 'operation-1' },
-        worktree: 'id:workspace-1',
-        agent: 'zcode',
-        resumeFrom: { providerSessionId: 'provider-session-1' }
-      })
-    ).rejects.toThrow('structured_agent_session_unsupported')
+    const intent = await runtime.resolveStructuredAgentSessionCreateIntent({
+      envelope: { sessionId: 'session-1', clientOperationId: 'operation-1' },
+      worktree: 'id:workspace-1',
+      agent: 'zcode',
+      resumeFrom: { providerSessionId: 'provider-session-1' }
+    })
+
+    // ZCode has no transcript to adopt by path; the reservation seeds the chain
+    // and session/resume proves the identity when the adapter acquires.
+    expect(intent.accountHome).toEqual({
+      variable: 'ZCODE_HOME',
+      path: join(homedir(), '.zcode')
+    })
+    expect(intent.adopt).toEqual({
+      providerHandle: { kind: 'opaque', agent: 'zcode', value: 'provider-session-1' }
+    })
+  })
+
+  it('pins the configured ZCODE_HOME for a zcode resume before the user default', async () => {
+    const runtime = runtimeForIntentTest({
+      agentDefaultEnv: { zcode: { ZCODE_HOME: '/configured/zcode-home' } }
+    })
+    vi.spyOn(runtime, 'getStructuredAgentSessionCreateSupport').mockResolvedValue({
+      supported: true
+    })
+    stubLocationResolution(runtime)
+
+    const intent = await runtime.resolveStructuredAgentSessionCreateIntent({
+      envelope: { sessionId: 'session-1', clientOperationId: 'operation-1' },
+      worktree: 'id:workspace-1',
+      agent: 'zcode',
+      resumeFrom: { providerSessionId: 'provider-session-1' }
+    })
+
+    expect(intent.accountHome).toEqual({
+      variable: 'ZCODE_HOME',
+      path: '/configured/zcode-home'
+    })
   })
 
   it('reports zcode create support on a local non-WSL workspace', async () => {

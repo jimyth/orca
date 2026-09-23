@@ -134,14 +134,12 @@ export class OrcaRuntimeWithResolveRecoveredStructuredTuiTranscript extends Orca
     resumeFrom?: { providerSessionId: string }
   }): Promise<AgentSessionAttachParams> {
     if (input.agent === 'zcode') {
-      if (input.resumeFrom) {
-        // The app-server adapter always session/creates; adopting a named conversation would
-        // resolve it through a Codex home scan and hand back a blank chat wearing the old name.
-        throw new Error('structured_agent_session_unsupported')
-      }
       // Zcode has no managed account home: app-server reads the user's real ~/.zcode, and the
       // launch resolver never reads this value back — it exists so record and wire agree.
-      return this.resolveStructuredAgentSessionIntent(input, async () => join(homedir(), '.zcode'))
+      return this.resolveStructuredAgentSessionIntent(
+        input,
+        ({ launchEnv }) => launchEnv.ZCODE_HOME?.trim() || join(homedir(), '.zcode')
+      )
     }
     if (input.agent === 'claude') {
       return this.resolveStructuredAgentSessionIntent(input, async ({ launchEnv, location }) => {
@@ -250,11 +248,12 @@ export class OrcaRuntimeWithResolveRecoveredStructuredTuiTranscript extends Orca
         path: adoption ? adoption.accountHomePath : selectedAccountHomePath
       },
       ...(options ? { options } : {}),
-      ...(input.resumeFrom && adoption
+      ...(input.resumeFrom && (adoption || input.agent === 'zcode')
         ? {
             // `adopt` is what makes the reservation seed the handle chain. Presence of
             // `providerHandle` alone must not: `agentSession.ensure` already passes one today
-            // without adopting anything.
+            // without adopting anything. Zcode never resolves an adoption (its conversations
+            // are server-side), so its adopt carries the handle and no transcript.
             adopt: {
               providerHandle:
                 input.agent === 'claude'
@@ -263,8 +262,14 @@ export class OrcaRuntimeWithResolveRecoveredStructuredTuiTranscript extends Orca
                       sessionId: input.resumeFrom.providerSessionId,
                       leafUuid: null
                     }
-                  : { kind: 'codex' as const, threadId: input.resumeFrom.providerSessionId },
-              transcriptPath: adoption.transcriptPath
+                  : input.agent === 'zcode'
+                    ? {
+                        kind: 'opaque' as const,
+                        agent: 'zcode' as const,
+                        value: input.resumeFrom.providerSessionId
+                      }
+                    : { kind: 'codex' as const, threadId: input.resumeFrom.providerSessionId },
+              ...(adoption ? { transcriptPath: adoption.transcriptPath } : {})
             }
           }
         : {}),

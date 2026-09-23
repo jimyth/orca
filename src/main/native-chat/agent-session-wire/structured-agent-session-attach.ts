@@ -47,6 +47,7 @@ import {
 } from './agent-session-journal-recovery'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { structuredAgentSessionRefusalMessage } from './structured-agent-session-refusal-message'
+import type { StructuredAgentSessionAdoptionHandle } from '../structured-agent-session-history-adoption'
 
 /**
  * Everything a client may declare about the session it wants. Deliberately no
@@ -75,8 +76,10 @@ export type AgentSessionAttachParams = {
    * without adopting — presence of a handle must never be what triggers a resume.
    */
   adopt?: {
-    providerHandle: Exclude<AgentSessionProviderHandle, { kind: 'opaque' }>
-    /** Omitted only when the exact committed operation replays an already-imported journal. */
+    providerHandle: StructuredAgentSessionAdoptionHandle
+    /** Omitted only when the exact committed operation replays an already-imported journal,
+     *  or for a provider whose conversation lives server-side (zcode) and has no
+     *  transcript file to import. */
     transcriptPath?: string
   }
 }
@@ -277,7 +280,7 @@ async function reconcileAgainstProviderHistory(input: {
 const ADOPTED_HANDLE_FENCE = 1
 
 function adoptedProviderHandleLink(
-  handle: Exclude<AgentSessionProviderHandle, { kind: 'opaque' }>,
+  handle: StructuredAgentSessionAdoptionHandle,
   observedAt: number
 ): AgentSessionProviderHandleLink {
   return handle.kind === 'claude'
@@ -289,13 +292,21 @@ function adoptedProviderHandleLink(
         fence: ADOPTED_HANDLE_FENCE,
         observedAt
       })
-    : codexProviderHandleLink({
-        threadId: handle.threadId,
-        resumed: false,
-        origin: 'adopted',
-        fence: ADOPTED_HANDLE_FENCE,
-        observedAt
-      })
+    : handle.kind === 'opaque'
+      ? {
+          linkId: `zcode-${ADOPTED_HANDLE_FENCE}-${handle.value}`.slice(0, 128),
+          handle: { provider: 'zcode', sessionId: handle.value },
+          origin: 'adopted',
+          mintedAtFence: ADOPTED_HANDLE_FENCE,
+          observedAt
+        }
+      : codexProviderHandleLink({
+          threadId: handle.threadId,
+          resumed: false,
+          origin: 'adopted',
+          fence: ADOPTED_HANDLE_FENCE,
+          observedAt
+        })
 }
 
 export function reserveRequestFor(input: {

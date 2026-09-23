@@ -7,6 +7,16 @@ import {
   importLegacyTranscriptIntoJournal,
   prepareLegacyTranscriptImport
 } from '../agent-session-journal/journal-legacy-import'
+import type { StructuredAgentSessionAdoptionHandle } from '../structured-agent-session-history-adoption'
+
+/** The provider conversation id an adopted handle names, in its own lane's spelling. */
+function adoptedProviderSessionId(handle: StructuredAgentSessionAdoptionHandle): string {
+  return handle.kind === 'claude'
+    ? handle.sessionId
+    : handle.kind === 'opaque'
+      ? handle.value
+      : handle.threadId
+}
 
 export async function prepareAdoptedTranscript(
   params: AgentSessionAttachParams
@@ -35,15 +45,17 @@ async function readAdoptedTranscript(
   if (!adopt) {
     return null
   }
+  if (params.agent === 'zcode') {
+    // ZCode conversations live in the provider's own storage; there is no
+    // transcript file to read. The resume itself is the proof of adoption.
+    return null
+  }
   if (!adopt.transcriptPath) {
     throw new Error('agent_session_identity_required')
   }
   const prepared = await prepareLegacyTranscriptImport({
     agent: params.agent,
-    sessionId:
-      adopt.providerHandle.kind === 'claude'
-        ? adopt.providerHandle.sessionId
-        : adopt.providerHandle.threadId,
+    sessionId: adoptedProviderSessionId(adopt.providerHandle),
     options: { filePath: adopt.transcriptPath }
   })
   if (!prepared.ok) {
@@ -82,6 +94,10 @@ async function applyAdoptedTranscript(
   if (!adopt || attached.journal.cursor().sequence > 1) {
     return
   }
+  if (params.agent === 'zcode') {
+    // Same as the read side: no transcript file exists, so there is nothing to import.
+    return
+  }
   if (prepared) {
     await attached.journal.replaceEpochItems('legacy_import', record.lease.runtimeFence, prepared)
     return
@@ -92,10 +108,7 @@ async function applyAdoptedTranscript(
   const imported = await importLegacyTranscriptIntoJournal({
     journal: attached.journal,
     agent: params.agent,
-    sessionId:
-      adopt.providerHandle.kind === 'claude'
-        ? adopt.providerHandle.sessionId
-        : adopt.providerHandle.threadId,
+    sessionId: adoptedProviderSessionId(adopt.providerHandle),
     fence: record.lease.runtimeFence,
     options: { filePath: adopt.transcriptPath }
   })

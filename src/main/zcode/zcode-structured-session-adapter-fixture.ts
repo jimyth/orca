@@ -104,6 +104,7 @@ export function adapterFor(
       command: 'zcode',
       args: ['app-server', '--stdio'],
       cwd: '/work/repo',
+      resumeSessionId: null,
       ...launch
     }),
     resolvePermissionMode: () => 'default',

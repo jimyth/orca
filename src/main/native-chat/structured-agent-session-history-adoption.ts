@@ -24,9 +24,16 @@ export type StructuredAgentSessionAdoption = {
   transcriptPath: string
 }
 
+/** The provider handle an adopting create names. ZCode's journal identity is the
+ *  opaque handle (it has no transcript to adopt by path), so opaque is legal
+ *  exactly for that lane. */
+export type StructuredAgentSessionAdoptionHandle =
+  | Exclude<AgentSessionProviderHandle, { kind: 'opaque' }>
+  | { kind: 'opaque'; agent: 'zcode'; value: string }
+
 export type CommittedStructuredAgentSessionAdoptionReplay = {
   record: AgentSessionRecord
-  providerHandle: Exclude<AgentSessionProviderHandle, { kind: 'opaque' }>
+  providerHandle: StructuredAgentSessionAdoptionHandle
 }
 
 /** Exact committed-operation identity; attach still validates its fingerprint. */
@@ -63,21 +70,18 @@ export function findCommittedStructuredAgentSessionAdoptionReplay(input: {
   if (providerSessionId !== input.providerSessionId) {
     return null
   }
-  // ZCode's journal identity is the opaque handle the adapter mints, which a replay cannot
-  // reconstruct from the durable record; its adoption replays through the adapter instead.
-  if (adopted.handle.provider === 'zcode') {
-    return null
-  }
   return {
     record,
     providerHandle:
       adopted.handle.provider === 'codex'
         ? { kind: 'codex', threadId: adopted.handle.threadId }
-        : {
-            kind: 'claude',
-            sessionId: adopted.handle.sessionId,
-            leafUuid: adopted.handle.leafUuid
-          }
+        : adopted.handle.provider === 'zcode'
+          ? { kind: 'opaque', agent: 'zcode', value: adopted.handle.sessionId }
+          : {
+              kind: 'claude',
+              sessionId: adopted.handle.sessionId,
+              leafUuid: adopted.handle.leafUuid
+            }
   }
 }
 

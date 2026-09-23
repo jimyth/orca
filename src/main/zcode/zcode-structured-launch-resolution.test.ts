@@ -82,8 +82,52 @@ describe('zcode structured launch resolution', () => {
     expect(launch).toEqual({
       command: '/usr/local/bin/zcode',
       args: ['app-server', '--stdio'],
-      cwd: '/repos/workspace-1'
+      cwd: '/repos/workspace-1',
+      resumeSessionId: null
     })
+  })
+
+  it('resumes the last provider session this record actually proved, not one a caller names', async () => {
+    const launch = await resolverFor(
+      record({
+        providerHandleChain: [
+          {
+            linkId: 'zcode-1-provider-session-old',
+            handle: { provider: 'zcode', sessionId: 'provider-session-old' },
+            origin: 'created',
+            mintedAtFence: 1,
+            observedAt: 1_700_000_000_000
+          },
+          {
+            linkId: 'zcode-3-provider-session-9',
+            handle: { provider: 'zcode', sessionId: 'provider-session-9' },
+            origin: 'resumed',
+            mintedAtFence: 3,
+            observedAt: 1_700_000_000_500
+          }
+        ]
+      })
+    )({ identity: IDENTITY })
+
+    expect(launch.resumeSessionId).toBe('provider-session-9')
+  })
+
+  it('ignores a chain head this adapter does not speak for rather than resuming it', async () => {
+    const launch = await resolverFor(
+      record({
+        providerHandleChain: [
+          {
+            linkId: 'codex-1-thread-1',
+            handle: { provider: 'codex', threadId: 'thread-1' },
+            origin: 'created',
+            mintedAtFence: 1,
+            observedAt: 1_700_000_000_000
+          }
+        ]
+      })
+    )({ identity: IDENTITY })
+
+    expect(launch.resumeSessionId).toBeNull()
   })
 
   it('passes a Windows .cmd path containing cmd syntax directly to the safe spawn layer', async () => {

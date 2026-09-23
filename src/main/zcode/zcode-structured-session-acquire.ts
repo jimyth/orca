@@ -1,8 +1,8 @@
 // Making one zcode session real: launch resolver → stdio connection (the
-// storage-readiness gate lives inside the connection) → session/create →
-// session/subscribe → the acquisition the host lease proves. Mirrors the codex
-// acquire path minus every codex-only concern (no rewind, no compaction, no
-// fast-mode catalog, no thread resume).
+// storage-readiness gate lives inside the connection) → session/create or
+// session/resume (whichever the durable record proved) → session/subscribe →
+// the acquisition the host lease proves. Mirrors the codex acquire path minus
+// every codex-only concern (no rewind, no compaction, no fast-mode catalog).
 
 import {
   AgentSessionAcquisitionExitUnprovenError,
@@ -22,7 +22,7 @@ import {
   zcodeRuntimePreferencesResponse
 } from './zcode-server-request-disposition'
 import type { ZcodeProtocolServerRequest, ZcodeSessionSendParams } from './zcode-protocol'
-import { zcodeSessionIdFromCreateResult } from './zcode-protocol'
+import { ZCODE_PROTOCOL_METHODS, zcodeSessionIdFromCreateResult } from './zcode-protocol'
 import {
   cancelZcodeAcquisitionAttempt,
   mintZcodeAcquisitionGeneration,
@@ -221,21 +221,47 @@ export async function acquireZcodeStructuredSession(input: {
       })
     }
     acquisitions.assertCurrent(sessionId, attempt)
-    const createResult = await connection.request(
-      'session/create',
-      {
-        workspace: {
-          workspacePath: launch.cwd,
-          workspaceKey: acquireInput.identity.workspaceId
-        },
-        ...(permissionMode === 'yolo' ? { mode: 'yolo' } : {})
-      },
-      { timeoutMs: deps.requestTimeoutMs }
-    )
+    // The record the launch resolver read names the conversation to resume; a
+    // caller never does. session/resume's params are strict, so the create-only
+    // mode pin stays on the create arm — the provider keeps the resumed
+    // session's own permission surface.
+    const openedResult = launch.resumeSessionId
+      ? await connection.request(
+          ZCODE_PROTOCOL_METHODS.sessionResume,
+          {
+            sessionId: launch.resumeSessionId,
+            workspace: {
+              workspacePath: launch.cwd,
+              workspaceKey: acquireInput.identity.workspaceId
+            }
+          },
+          { timeoutMs: deps.requestTimeoutMs }
+        )
+      : await connection.request(
+          'session/create',
+          {
+            workspace: {
+              workspacePath: launch.cwd,
+              workspaceKey: acquireInput.identity.workspaceId
+            },
+            ...(permissionMode === 'yolo' ? { mode: 'yolo' } : {})
+          },
+          { timeoutMs: deps.requestTimeoutMs }
+        )
     acquisitions.assertCurrent(sessionId, attempt)
-    const providerSessionId = zcodeSessionIdFromCreateResult(createResult)
+    const providerSessionId = zcodeSessionIdFromCreateResult(openedResult)
     if (providerSessionId === null) {
-      throw new Error(`zcode app-server session/create did not name a session for ${sessionId}`)
+      throw launch.resumeSessionId
+        ? new Error(`zcode app-server session/resume did not name a session for ${sessionId}`)
+        : new Error(`zcode app-server session/create did not name a session for ${sessionId}`)
+    }
+    if (launch.resumeSessionId !== null && providerSessionId !== launch.resumeSessionId) {
+      // A resume that lands on another session is a fork wearing a resume's
+      // name; recording it would make the durable handle chain lie about what
+      // this session actually proved.
+      throw new Error(
+        `zcode app-server resumed ${providerSessionId} instead of ${launch.resumeSessionId}`
+      )
     }
     await connection.request(
       'session/subscribe',
@@ -267,8 +293,8 @@ export async function acquireZcodeStructuredSession(input: {
       fence: acquireInput.fence,
       acquisitionGeneration,
       providerSessionId,
-      modelSelection: readZcodeModelSelectionEcho(createResult),
-      availableModels: readZcodeAvailableModels(createResult),
+      modelSelection: readZcodeModelSelectionEcho(openedResult),
+      availableModels: readZcodeAvailableModels(openedResult),
       optionOverrides: restoredZcodeOptionOverrides(acquireInput.options),
       prompts: acquisition.prompts,
       answeredRequests: new Set(),
@@ -291,7 +317,7 @@ export async function acquireZcodeStructuredSession(input: {
         linkId:
           deps.mintLinkId?.() ?? `zcode-${acquireInput.fence}-${providerSessionId}`.slice(0, 128),
         handle: { provider: 'zcode', sessionId: providerSessionId },
-        origin: 'created',
+        origin: launch.resumeSessionId !== null ? 'resumed' : 'created',
         mintedAtFence: acquireInput.fence,
         observedAt: deps.now?.() ?? Date.now()
       },

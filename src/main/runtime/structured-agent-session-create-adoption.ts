@@ -10,7 +10,8 @@ import {
   findCommittedStructuredAgentSessionAdoptionReplay,
   findConflictingStructuredAdoption,
   resolveStructuredAgentSessionAdoption,
-  structuredAdoptionConflictError
+  structuredAdoptionConflictError,
+  type StructuredAgentSessionAdoption
 } from '../native-chat/structured-agent-session-history-adoption'
 import { resolveSessionFilePath } from '../native-chat/session-file-resolver'
 import { configuredAdditionalCodexHomePaths } from '../ai-vault/cached-session-list'
@@ -68,7 +69,7 @@ export async function resolveStructuredAgentSessionAdoptionForCreate(input: {
   providerSessionId: string
   selfSessionId: string
   selectedAccountHomePath: string
-}) {
+}): Promise<StructuredAgentSessionAdoption | null> {
   const conflict = input.host
     ? findConflictingStructuredAdoption({
         agent: input.agent,
@@ -79,6 +80,13 @@ export async function resolveStructuredAgentSessionAdoptionForCreate(input: {
     : null
   if (conflict) {
     throw structuredAdoptionConflictError(conflict)
+  }
+  // ZCode conversations live in the provider's own storage, not under any account
+  // home Orca can scan, so there is no transcript to discover. The one-writer
+  // conflict check above still applies, and the resume proves the identity: a
+  // session id the provider does not know fails acquisition outright.
+  if (input.agent === 'zcode') {
+    return null
   }
   return resolveStructuredAgentSessionAdoption({
     agent: input.agent,

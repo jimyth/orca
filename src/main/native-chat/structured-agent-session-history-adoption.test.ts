@@ -163,6 +163,42 @@ describe('findCommittedStructuredAgentSessionAdoptionReplay', () => {
       }
     })
   })
+
+  it('mints the zcode journal identity the committed adoption proved', () => {
+    const lease = agentSessionLeaseFixture({ sessionId: 'zcode_adopted' })
+    const record = agentSessionRecordFixture(lease)
+    record.provider = 'zcode'
+    record.providerHandleChain[0] = {
+      ...record.providerHandleChain[0]!,
+      linkId: 'zcode-1-provider-session-1',
+      origin: 'adopted',
+      handle: { provider: 'zcode', sessionId: 'provider-session-1' }
+    }
+
+    expect(
+      findCommittedStructuredAgentSessionAdoptionReplay({
+        agent: 'zcode',
+        providerSessionId: 'provider-session-1',
+        selfSessionId: 'zcode_adopted',
+        callerKey: 'client-1',
+        operationId: OPERATION,
+        record,
+        operations: [
+          {
+            callerKey: 'client-1',
+            operationId: OPERATION,
+            fingerprint: 'fingerprint-1',
+            operationTimestamp: 1_800_000_000_000,
+            recordedAt: 1_800_000_000_000,
+            expiresAt: 1_900_000_000_000,
+            outcome: { status: 'succeeded', sessionId: 'zcode_adopted' }
+          }
+        ]
+      })
+    ).toMatchObject({
+      providerHandle: { kind: 'opaque', agent: 'zcode', value: 'provider-session-1' }
+    })
+  })
 })
 
 describe('structuredAdoptionConflictError', () => {

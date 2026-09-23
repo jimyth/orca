@@ -186,7 +186,8 @@ describe('ZcodeStructuredSessionAdapter.acquire', () => {
       resolveLaunch: async () => ({
         command: 'zcode',
         args: ['app-server', '--stdio'],
-        cwd: '/work/repo'
+        cwd: '/work/repo',
+        resumeSessionId: null
       }),
       resolvePermissionMode: () => 'yolo',
       openConnection: zcode.openConnection,
@@ -197,6 +198,78 @@ describe('ZcodeStructuredSessionAdapter.acquire', () => {
     expect(zcode.connections[0].calls[0].params).toEqual({
       workspace: { workspacePath: '/work/repo', workspaceKey: 'ws-1' },
       mode: 'yolo'
+    })
+  })
+
+  it('sends session/resume then session/subscribe and reports a resumed handle', async () => {
+    const zcode = fakeZcode({
+      'session/resume': () => ({
+        session: {
+          sessionId: PROVIDER_SESSION_ID,
+          model: { providerId: 'bigmodel-test', modelId: 'GLM-5.3' }
+        }
+      })
+    })
+    const adapter = adapterFor(zcode, { resumeSessionId: PROVIDER_SESSION_ID })
+
+    const acquisition = await adapter.acquire({
+      identity: identityFor('session-1'),
+      fence: 9,
+      spawnToken: 'spawn-11'
+    })
+
+    expect(zcode.connections[0].calls.map((call) => call.method)).toEqual([
+      'session/resume',
+      'session/subscribe'
+    ])
+    expect(zcode.connections[0].calls[0].params).toEqual({
+      sessionId: PROVIDER_SESSION_ID,
+      workspace: { workspacePath: '/work/repo', workspaceKey: 'ws-1' }
+    })
+    expect(zcode.connections[0].calls[1].params).toEqual({
+      sessionId: PROVIDER_SESSION_ID,
+      deliveryKind: 'desktop-continuous'
+    })
+    expect(acquisition.link).toMatchObject({
+      handle: { provider: 'zcode', sessionId: PROVIDER_SESSION_ID },
+      origin: 'resumed',
+      mintedAtFence: 9
+    })
+  })
+
+  it('refuses a resume that lands on another session and reaps the child', async () => {
+    const zcode = fakeZcode({
+      'session/resume': () => ({ session: { sessionId: 'sess_forked-under-resumes-name' } })
+    })
+    const adapter = adapterFor(zcode, { resumeSessionId: PROVIDER_SESSION_ID })
+
+    // A resume that lands elsewhere is a fork wearing a resume's name; recording
+    // it would make the durable handle chain lie about what this session proved.
+    await expect(
+      adapter.acquire({ identity: identityFor('session-1'), fence: 9, spawnToken: 'spawn-11' })
+    ).rejects.toThrow(
+      `zcode app-server resumed sess_forked-under-resumes-name instead of ${PROVIDER_SESSION_ID}`
+    )
+    expect(zcode.connections[0].closeCount).toBe(1)
+  })
+
+  it('restores persisted option overrides on a resumed session', async () => {
+    const zcode = fakeZcode({
+      'session/resume': () => ({ session: { sessionId: PROVIDER_SESSION_ID } })
+    })
+    const adapter = adapterFor(zcode, { resumeSessionId: PROVIDER_SESSION_ID })
+
+    await adapter.acquire({
+      identity: identityFor('session-1'),
+      fence: 9,
+      spawnToken: 'spawn-11',
+      options: { model: 'bigmodel-test/GLM-5.3-Flash', effort: 'medium' }
+    })
+
+    await expect(
+      adapter.readOptions?.({ sessionId: 'session-1', fence: 9 })
+    ).resolves.toMatchObject({
+      current: { model: 'bigmodel-test/GLM-5.3-Flash', effort: 'medium' }
     })
   })
 
@@ -330,7 +403,8 @@ describe('ZcodeStructuredSessionAdapter.dispatch', () => {
       resolveLaunch: async () => ({
         command: 'zcode',
         args: ['app-server', '--stdio'],
-        cwd: '/work/repo'
+        cwd: '/work/repo',
+        resumeSessionId: null
       }),
       resolvePermissionMode: () => 'default',
       resolveModelSelection: async () => MODEL_SELECTION,

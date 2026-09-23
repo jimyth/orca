@@ -6,6 +6,7 @@
 // caller names that the record did not pin.
 
 import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
+import { agentSessionProviderHandleChainHead } from '../../shared/agent-session-provider-handle'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { resolveZcodeCommand } from '../../shared/node-cli-command-resolution'
 import type { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
@@ -15,6 +16,9 @@ export type ZcodeStructuredLaunch = {
   args: string[]
   env?: Record<string, string>
   cwd: string
+  /** Provider session a resume must name, read from the last link the durable
+   *  record proved — never one a caller asks for. Null starts a new session. */
+  resumeSessionId: string | null
 }
 
 export type ZcodeStructuredLaunchResolverDeps = {
@@ -69,6 +73,10 @@ export function createZcodeStructuredLaunchResolver(
     const environment = await deps.resolveEnvironment?.()
     const pathEnv = environment?.PATH ?? environment?.Path ?? null
     const homePath = environment?.HOME ?? environment?.USERPROFILE
+    // An empty chain is a session that has never proved a provider session, so
+    // it creates one; anything else resumes the last link this session proved.
+    const head = agentSessionProviderHandleChainHead(record.providerHandleChain)
+    const resumeSessionId = head?.handle.provider === 'zcode' ? head.handle.sessionId : null
     return {
       command: (deps.resolveCommand ?? resolveZcodeCommand)({
         pathEnv,
@@ -77,6 +85,7 @@ export function createZcodeStructuredLaunchResolver(
       // The wire is JSON-RPC over stdio; there is no other transport to choose.
       args: ['app-server', '--stdio'],
       cwd: await deps.resolveWorkspacePath(location.workspaceId),
+      resumeSessionId,
       ...(environment ? { env: envOverlay(environment) } : {})
     }
   }
